@@ -4,25 +4,29 @@
 
 :root {
   font-family: "Cairo", sans-serif;
+  color: #0f172a;
+  background-color: #f8fafc;
 }
 
 * {
-  margin: 0;
-  padding: 0;
   box-sizing: border-box;
 }
 
 html,
 body,
 #root {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
   width: 100%;
-  min-height: 100vh;
-  direction: rtl;
-  background: #f8fafc;
-  color: #0f172a;
-  font-family: "Cairo", sans-serif;
 }
 
 body {
+  direction: rtl;
+  font-family: "Cairo", sans-serif;
+  background: #f8fafc;
+  color: #0f172a;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   -webkit-tap-highlight-color: transparent;
 }
