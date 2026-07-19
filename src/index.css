@@ -1,0 +1,28 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: "Cairo", sans-serif;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  min-height: 100vh;
+  direction: rtl;
+  background: #f8fafc;
+  color: #0f172a;
+  font-family: "Cairo", sans-serif;
+}
+
+body {
+  -webkit-tap-highlight-color: transparent;
+}
