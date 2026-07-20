@@ -451,7 +451,7 @@ export default function Players() {
                       <Edit2 className="h-4 w-4" />
                     </button>
                     <button 
-                      onClick={() => startDelete(player)}
+                      onClick={() => alert("زر الحذف شغال")}
                       className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
                       title="حذف اللاعب"
                     >
