@@ -247,15 +247,28 @@ export default function Players() {
 };
       
       // إغلاق النافذة وتصفير الحالة بعد النجاح
-      setIsDeleteModalOpen(false);
-      setPlayerToDelete(null);
-    } catch (error) {
-      console.error("Error deleting player:", error);
-      alert("حدث خطأ غير متوقع أثناء محاولة حذف اللاعب، يرجى التحقق من اتصال الشبكة.");
-    } finally {
-      setSubmitting(false);
-    }
-  };
+      const handleConfirmDelete = async () => {
+  alert("تم الضغط على نعم احذف");
+
+  if (!playerToDelete || submitting) return;
+
+  setSubmitting(true);
+
+  try {
+    const playerDocRef = doc(db, "players", playerToDelete.id);
+    await deleteDoc(playerDocRef);
+
+    alert("تم الحذف");
+
+    setIsDeleteModalOpen(false);
+    setPlayerToDelete(null);
+  } catch (error) {
+    console.error(error);
+    alert("خطأ بالحذف");
+  } finally {
+    setSubmitting(false);
+  }
+};
 
   // شاشة التحميل الدوارة لحين اكتمال الـ Handshake السحابي
   if (loading) {
