@@ -496,3 +496,42 @@ export default function Players() {
             <div className="space-y-1">
               <h3 className="font-black text-base text-slate-900">هل أنت متأكد من حذف اللاعب؟</h3>
               <p className="text-xs text-slate-500 leading-
+              relaxed px-2">
+  سيتم إزالة اللاعب <span className="font-bold text-slate-900">"{playerToDelete.fullName}"</span> نهائياً من سجلات الأكاديمية السحابية. هذا الإجراء قطعي ولا يمكن التراجع عنه.
+</p>
+</div>
+
+<div className="flex space-x-3 space-x-reverse pt-2">
+  <button
+    type="button"
+    disabled={submitting}
+    onClick={handleConfirmDelete}
+    className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 active:scale-[0.98] text-white font-bold text-xs rounded-xl flex items-center justify-center space-x-1.5 space-x-reverse shadow-sm shadow-red-200 transition-all disabled:opacity-50"
+  >
+    {submitting ? (
+      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+    ) : (
+      <Trash2 className="h-3.5 w-3.5" />
+    )}
+    <span>{submitting ? 'جاري الحذف...' : 'نعم، احذف'}</span>
+  </button>
+
+  <button
+    type="button"
+    disabled={submitting}
+    onClick={() => {
+      setIsDeleteModalOpen(false);
+      setPlayerToDelete(null);
+    }}
+    className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs rounded-xl transition-colors disabled:opacity-50"
+  >
+    إلغاء
+  </button>
+</div>
+</div>
+</div>
+)}
+
+</div>
+);
+}
