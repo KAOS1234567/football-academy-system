@@ -238,13 +238,11 @@ export default function Players() {
 
     setIsDeleteModalOpen(false);
     setPlayerToDelete(null);
-  } catch (error) {
-    console.error(error);
-    alert("خطأ بالحذف");
-  } finally {
-    setSubmitting(false);
+  } 
+  catch (error: any) {
+  console.error(error);
+  alert(error.message);
   }
-};
       
       // إغلاق النافذة وتصفير الحالة بعد النجاح
       
