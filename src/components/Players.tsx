@@ -6,6 +6,7 @@ import {
   doc, 
   getDoc, 
   updateDoc, 
+  deleteDoc,
   query, 
   where, 
   onSnapshot, 
@@ -20,7 +21,9 @@ import {
   Phone, 
   Activity, 
   Loader2, 
-  Edit2 
+  Edit2,
+  Trash2,
+  AlertTriangle
 } from 'lucide-react';
 
 // تعريف الواجهة البرمجية لبيانات اللاعب لضمان مطابقة TypeScript
@@ -51,6 +54,10 @@ export default function Players() {
   
   // حالة الاحتفاظ باللاعب الجاري تعديله حالياً
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
+
+  // حالات إدارة ميزة الحذف الآمن
+  const [playerToDelete, setPlayerToDelete] = useState<Player | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
   // حالة استمارة الإدخال والتعديل الموحدة
   const [formData, setFormData] = useState({
@@ -147,6 +154,12 @@ export default function Players() {
     setView('edit');
   };
 
+  // تفعيل واجهة الحذف الآمن للاعب المختار
+  const startDelete = (player: Player) => {
+    setPlayerToDelete(player);
+    setIsDeleteModalOpen(true);
+  };
+
   // دالة حفظ لاعب جديد في Firestore
   const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -199,6 +212,26 @@ export default function Players() {
     } catch (error) {
       console.error("Error updating player:", error);
       alert("حدث خطأ أثناء تحديث بيانات اللاعب، يرجى المحاولة لاحقاً.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // دالة الحذف النهائي القطعي من قاعدة البيانات السحابية
+  const handleConfirmDelete = async () => {
+    if (!playerToDelete || submitting) return;
+    setSubmitting(true);
+
+    try {
+      const playerDocRef = doc(db, 'players', playerToDelete.id);
+      await deleteDoc(playerDocRef);
+      
+      // إغلاق النافذة وتصفير الحالة بعد النجاح
+      setIsDeleteModalOpen(false);
+      setPlayerToDelete(null);
+    } catch (error) {
+      console.error("Error deleting player:", error);
+      alert("حدث خطأ غير متوقع أثناء محاولة حذف اللاعب، يرجى التحقق من اتصال الشبكة.");
     } finally {
       setSubmitting(false);
     }
@@ -408,14 +441,23 @@ export default function Players() {
                     </span>
                   </div>
                   
-                  {/* زر التعديل المخصص والمتجاوب بصرياً مع الهواتف */}
-                  <button 
-                    onClick={() => startEdit(player)}
-                    className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
-                    title="تعديل بيانات اللاعب"
-                  >
-                    <Edit2 className="h-4 w-4" />
-                  </button>
+                  {/* أزرار العمليات والتحكم المتجاوبة */}
+                  <div className="flex items-center space-x-1 space-x-reverse">
+                    <button 
+                      onClick={() => startEdit(player)}
+                      className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
+                      title="تعديل بيانات اللاعب"
+                    >
+                      <Edit2 className="h-4 w-4" />
+                    </button>
+                    <button 
+                      onClick={() => startDelete(player)}
+                      className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                      title="حذف اللاعب"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 border-t border-b border-slate-50 py-3 text-xs text-slate-600">
@@ -443,7 +485,14 @@ export default function Players() {
         </div>
       )}
 
-    </div>
-  );
-        }
-    
+      {/* --- نافذة تأكيد الحذف المنبثقة والآمنة (UX Confirmation Modal) --- */}
+      {isDeleteModalOpen && playerToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white w-full max-w-sm rounded-2xl p-6 shadow-xl border border-slate-100 space-y-4 text-center animate-scale-up">
+            <div className="w-12 h-12 rounded-full bg-red-50 text-red-600 flex items-center justify-center mx-auto shadow-inner">
+              <AlertTriangle className="h-6 w-6" />
+            </div>
+            
+            <div className="space-y-1">
+              <h3 className="font-black text-base text-slate-900">هل أنت متأكد من حذف اللاعب؟</h3>
+              <p className="text-xs text-slate-500 leading-
