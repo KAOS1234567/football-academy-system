@@ -495,8 +495,7 @@ export default function Players() {
             
             <div className="space-y-1">
               <h3 className="font-black text-base text-slate-900">هل أنت متأكد من حذف اللاعب؟</h3>
-              <p className="text-xs text-slate-500 leading-
-              relaxed px-2">
+              <p className="text-xs text-slate-500 leading-relaxed px-2">
   سيتم إزالة اللاعب <span className="font-bold text-slate-900">"{playerToDelete.fullName}"</span> نهائياً من سجلات الأكاديمية السحابية. هذا الإجراء قطعي ولا يمكن التراجع عنه.
 </p>
 </div>
