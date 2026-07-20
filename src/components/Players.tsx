@@ -5,14 +5,28 @@ import {
   addDoc, 
   doc, 
   getDoc, 
+  updateDoc,
+  deleteDoc,
   query, 
   where, 
   onSnapshot, 
   serverTimestamp 
 } from 'firebase/firestore';
-import { Users, UserPlus, ArrowRight, Save, Calendar, Phone, Activity, ShieldCheck, Loader2 } from 'lucide-react';
+import { 
+  Users, 
+  UserPlus, 
+  ArrowRight, 
+  Save, 
+  Calendar, 
+  Phone, 
+  Activity, 
+  ShieldCheck, 
+  Loader2, 
+  Edit2, 
+  Trash2, 
+  AlertTriangle 
+} from 'lucide-react';
 
-// واجهة تعريف بيانات اللاعب برمجياً
 interface Player {
   id: string;
   fullName: string;
@@ -23,7 +37,6 @@ interface Player {
   createdAt: any;
 }
 
-// قاموس لترجمة مراكز اللعب للغة العربية في الواجهة
 const positionTranslations: Record<string, string> = {
   Goalkeeper: 'حارس مرمى (GK)',
   Defender: 'مدافع (DF)',
@@ -32,13 +45,17 @@ const positionTranslations: Record<string, string> = {
 };
 
 export default function Players() {
-  const [view, setView] = useState<'list' | 'add'>('list');
+  const [view, setView] = useState<'list' | 'add' | 'edit'>('list');
   const [academyId, setAcademyId] = useState<string | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  
+  // حالات التحكم في اللاعب المختار والحذف
+  const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
-  // حالة استمارة الإدخال
+  // حالة استمارة الإدخال والتعديل
   const [formData, setFormData] = useState({
     fullName: '',
     birthDate: '',
@@ -47,7 +64,7 @@ export default function Players() {
     medicalNotes: ''
   });
 
-  // 1. جلب سياق الأكاديمية وإعداد المستمع اللحظي للاعبين
+  // جلب سياق الأكاديمية وإعداد المستمع اللحظي
   useEffect(() => {
     let unsubscribePlayers: (() => void) | null = null;
 
@@ -56,7 +73,6 @@ export default function Players() {
         const currentUser = auth.currentUser;
         if (!currentUser) return;
 
-        // جلب معرف الأكاديمية الخاص بالمدرب الحالي
         const userDocRef = doc(db, 'users', currentUser.uid);
         const userDocSnap = await getDoc(userDocRef);
 
@@ -65,13 +81,11 @@ export default function Players() {
           const currentAcademyId = uData.academyId;
           setAcademyId(currentAcademyId);
 
-          // إعداد استعلام مراقبة اللاعبين التابعين لهذه الأكاديمية فقط
           const q = query(
             collection(db, 'players'),
             where('academyId', '==', currentAcademyId)
           );
 
-          // الاستماع اللحظي للتغيرات في Firestore
           unsubscribePlayers = onSnapshot(q, (snapshot) => {
             const fetchedPlayers: Player[] = [];
             snapshot.forEach((doc) => {
@@ -81,7 +95,7 @@ export default function Players() {
               } as Player);
             });
 
-            // ترتيب اللاعبين محلياً في الذاكرة من الأحدث للأقدم لتجنب مشاكل الفهرسة المركبة حالياً
+            // ترتيب زمني محلي لحين بناء الفهارس المركبة لاحقاً
             fetchedPlayers.sort((a, b) => {
               const timeA = a.createdAt?.seconds || 0;
               const timeB = b.createdAt?.seconds || 0;
@@ -103,27 +117,42 @@ export default function Players() {
 
     initializeContext();
 
-    // تنظيف المستمع عند الخروج من المكون لحفظ استهلاك قراءات الـ Firebase
     return () => {
       if (unsubscribePlayers) unsubscribePlayers();
     };
   }, []);
 
-  // دالة تحديث قيم الحقول
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  // 2. معالجة حفظ البيانات الفعلي في Firestore
-  const handleFirestoreSubmit = async (e: React.FormEvent) => {
+  // الانتقال لوضع التعديل وحقن البيانات
+  const startEdit = (player: Player) => {
+    setSelectedPlayer(player);
+    setFormData({
+      fullName: player.fullName,
+      birthDate: player.birthDate,
+      position: player.position,
+      parentPhone: player.parentPhone,
+      medicalNotes: player.medicalNotes
+    });
+    setView('edit');
+  };
+
+  // فتح نافذة تأكيد الحذف
+  const startDelete = (player: Player) => {
+    setSelectedPlayer(player);
+    setIsDeleteModalOpen(true);
+  };
+
+  // دالة حفظ لاعب جديد
+  const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!academyId || submitting) return;
-
     setSubmitting(true);
 
     try {
-      // إدخال الوثيقة في مجموعة players الرئيسية مع عزل الـ SaaS
       await addDoc(collection(db, 'players'), {
         fullName: formData.fullName.trim(),
         birthDate: formData.birthDate,
@@ -132,21 +161,66 @@ export default function Players() {
         medicalNotes: formData.medicalNotes.trim(),
         academyId: academyId,
         createdBy: auth.currentUser?.uid,
-        createdAt: serverTimestamp() // طابع زمني دقيق وموحد من خوادم جوجل
+        createdAt: serverTimestamp()
       });
 
-      // تنظيف الاستمارة والعودة تلقائياً
       setFormData({ fullName: '', birthDate: '', position: '', parentPhone: '', medicalNotes: '' });
       setView('list');
     } catch (error) {
-      console.error("Error saving player to Firestore:", error);
-      alert("حدث خطأ أثناء حفظ البيانات، يرجى التحقق من اتصالك بالإنترنت.");
+      console.error("Error adding player:", error);
+      alert("حدث خطأ أثناء حفظ البيانات.");
     } finally {
       setSubmitting(false);
     }
   };
 
-  // شاشة التحميل الأولية أثناء جلب البيانات من السحابة
+  // دالة تحديث بيانات اللاعب في Firestore
+  const handleUpdateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedPlayer || submitting) return;
+    setSubmitting(true);
+
+    try {
+      const playerDocRef = doc(db, 'players', selectedPlayer.id);
+      await updateDoc(playerDocRef, {
+        fullName: formData.fullName.trim(),
+        birthDate: formData.birthDate,
+        position: formData.position,
+        parentPhone: formData.parentPhone.trim(),
+        medicalNotes: formData.medicalNotes.trim(),
+        updatedAt: serverTimestamp() // تتبع وقت التعديل لأغراض الرقابة الإدارية
+      });
+
+      setFormData({ fullName: '', birthDate: '', position: '', parentPhone: '', medicalNotes: '' });
+      setSelectedPlayer(null);
+      setView('list');
+    } catch (error) {
+      console.error("Error updating player:", error);
+      alert("حدث خطأ أثناء تحديث بيانات اللاعب.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // دالة حذف اللاعب النهائية من السحابة
+  const confirmDelete = async () => {
+    if (!selectedPlayer || submitting) return;
+    setSubmitting(true);
+
+    try {
+      const playerDocRef = doc(db, 'players', selectedPlayer.id);
+      await deleteDoc(playerDocRef);
+      
+      setIsDeleteModalOpen(false);
+      setSelectedPlayer(null);
+    } catch (error) {
+      console.error("Error deleting player:", error);
+      alert("حدث خطأ أثناء حذف اللاعب.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div class="py-12 flex flex-col items-center justify-center space-y-3">
@@ -156,27 +230,36 @@ export default function Players() {
     );
   }
 
-  // --- شاشة نموذج إضافة لاعب جديد ---
-  if (view === 'add') {
+  // --- شاشات الإدخال والتعديل (تشترك في نفس التصميم البصري الهيكلي) ---
+  if (view === 'add' || view === 'edit') {
+    const isEditMode = view === 'edit';
     return (
       <div class="space-y-6 animate-fade-in pb-12">
         
         <div class="flex items-center space-x-3 space-x-reverse border-b border-slate-100 pb-4">
           <button 
             type="button"
-            onClick={() => setView('list')} 
+            onClick={() => {
+              setView('list');
+              setSelectedPlayer(null);
+              setFormData({ fullName: '', birthDate: '', position: '', parentPhone: '', medicalNotes: '' });
+            }} 
             class="p-2 bg-white rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
             title="رجوع"
           >
             <ArrowRight class="h-5 w-5" />
           </button>
           <div>
-            <h2 class="text-lg font-black text-slate-900">إضافة لاعب جديد للأكاديمية</h2>
-            <p class="text-xs text-slate-500 mt-0.5">سيتم تخزين هذا اللاعب بأمان تحت الهوية البرمجية لأكاديميتك.</p>
+            <h2 class="text-lg font-black text-slate-900">
+              {isEditMode ? `تعديل بيانات: ${selectedPlayer?.fullName}` : 'إضافة لاعب جديد للأكاديمية'}
+            </h2>
+            <p class="text-xs text-slate-500 mt-0.5">
+              {isEditMode ? 'تعديل الحقول المطلوبة واضغط حفظ لتحديث قاعدة البيانات فوراً.' : 'سيتم تخزين هذا اللاعب بأمان تحت الهوية البرمجية لأكاديميتك.'}
+            </p>
           </div>
         </div>
 
-        <form onSubmit={handleFirestoreSubmit} class="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm space-y-4">
+        <form onSubmit={isEditMode ? handleUpdateSubmit : handleAddSubmit} class="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm space-y-4">
           
           <div class="space-y-1">
             <label class="text-xs font-bold text-slate-700 block">الاسم الكامل للاعب *</label>
@@ -259,12 +342,16 @@ export default function Players() {
               class="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white font-bold text-sm rounded-xl flex items-center justify-center space-x-2 space-x-reverse shadow-sm shadow-emerald-200 transition-all disabled:opacity-70 disabled:pointer-events-none"
             >
               {submitting ? <Loader2 class="h-4 w-4 animate-spin" /> : <Save class="h-4 w-4" />}
-              <span>{submitting ? 'جاري الحفظ سحابياً...' : 'حفظ وتخزين اللاعب'}</span>
+              <span>{submitting ? 'جاري الحفظ...' : isEditMode ? 'تحديث البيانات سحابياً' : 'حفظ وتخزين اللاعب'}</span>
             </button>
             <button 
               type="button"
               disabled={submitting}
-              onClick={() => setView('list')}
+              onClick={() => {
+                setView('list');
+                setSelectedPlayer(null);
+                setFormData({ fullName: '', birthDate: '', position: '', parentPhone: '', medicalNotes: '' });
+              }}
               class="px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-sm rounded-xl transition-colors disabled:opacity-50"
             >
               إلغاء
@@ -277,9 +364,9 @@ export default function Players() {
     );
   }
 
-  // --- شاشة العرض الرئيسية لقائمة اللاعبين الحقيقية ---
+  // --- شاشة العرض الرئيسية لقائمة اللاعبين ---
   return (
-    <div class="space-y-6 animate-fade-in">
+    <div class="space-y-6 animate-fade-in relative">
       
       <div class="flex items-center justify-between border-b border-slate-100 pb-4">
         <div>
@@ -299,7 +386,6 @@ export default function Players() {
         )}
       </div>
 
-      {/* الحالة أ: إذا كانت قاعدة البيانات فارغة تماماً لهذا المستخدم */}
       {players.length === 0 ? (
         <div class="bg-white rounded-2xl p-8 border border-slate-100 shadow-sm text-center max-w-md mx-auto my-8 space-y-4">
           <div class="w-16 h-16 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto shadow-sm shadow-emerald-100">
@@ -308,60 +394,72 @@ export default function Players() {
           <div class="space-y-1">
             <h3 class="font-bold text-base text-slate-900">لا يوجد لاعبين مسجلين بعد</h3>
             <p class="text-slate-500 text-xs leading-relaxed px-4">
-              قاعدة البيانات السحابية فارغة حالياً. أضف أول لاعب لتجربة المزامنة والتدفق الحي للبيانات.
+              قائمة الأكاديمية فارغة. أضف لاعبك الأول لإدارة البيانات والتحكم الفني.
             </p>
           </div>
-          
           <button 
             onClick={() => setView('add')}
-            class="w-full py-3 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white font-bold text-sm rounded-xl flex items-center justify-center space-x-2 space-x-reverse shadow-sm shadow-emerald-100 transition-all"
+            class="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl flex items-center justify-center space-x-2 space-x-reverse shadow-sm shadow-emerald-100 transition-all"
           >
             <UserPlus class="h-4 w-4" />
             <span>إضافة أول لاعب الآن</span>
           </button>
         </div>
       ) : (
-        /* الحالة ب: عرض اللاعبين الفعليين (Mobile-First Cards Structure) */
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {players.map((player) => (
             <div 
               key={player.id} 
-              class="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm space-y-4 hover:border-slate-200 transition-all relative overflow-hidden"
+              class="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm space-y-4 hover:border-slate-200 transition-all relative overflow-hidden flex flex-col justify-between"
             >
-              {/* شريط علوي جانبي يعبر عن المركز */}
               <div class="absolute top-0 left-0 bottom-0 w-1.5 bg-emerald-500"></div>
 
-              <div class="flex items-start justify-between">
-                <div class="space-y-0.5">
-                  <h4 class="font-bold text-base text-slate-900">{player.fullName}</h4>
-                  <span class="inline-block bg-slate-100 text-slate-600 px-2 py-0.5 rounded-lg text-[11px] font-bold">
-                    {positionTranslations[player.position] || player.position}
-                  </span>
+              <div class="space-y-3">
+                <div class="flex items-start justify-between">
+                  <div class="space-y-0.5">
+                    <h4 class="font-bold text-base text-slate-900">{player.fullName}</h4>
+                    <span class="inline-block bg-slate-100 text-slate-600 px-2 py-0.5 rounded-lg text-[11px] font-bold">
+                      {positionTranslations[player.position] || player.position}
+                    </span>
+                  </div>
+                  
+                  {/* أزرار العمليات التكتيكية (تعديل وحذف) */}
+                  <div class="flex items-center space-x-1 space-x-reverse">
+                    <button 
+                      onClick={() => startEdit(player)}
+                      class="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
+                      title="تعديل بيانات اللاعب"
+                    >
+                      <Edit2 class="h-4 w-4" />
+                    </button>
+                    <button 
+                      onClick={() => startDelete(player)}
+                      class="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                      title="حذف اللاعب نهائياً"
+                    >
+                      <Trash2 class="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
-                <div class="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                  <ShieldCheck class="h-4 w-4" />
-                </div>
-              </div>
 
-              {/* تفاصيل اللاعب الفنية والاتصال */}
-              <div class="grid grid-cols-2 gap-3 border-t border-b border-slate-50 py-3 text-xs text-slate-600">
-                <div class="flex items-center space-x-1.5 space-x-reverse">
-                  <Calendar class="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
-                  <span>المواليد: {player.birthDate}</span>
+                <div class="grid grid-cols-2 gap-3 border-t border-b border-slate-50 py-3 text-xs text-slate-600">
+                  <div class="flex items-center space-x-1.5 space-x-reverse">
+                    <Calendar class="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+                    <span>المواليد: {player.birthDate}</span>
+                  </div>
+                  <div class="flex items-center space-x-1.5 space-x-reverse dir-rtl">
+                    <Phone class="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+                    <span class="font-semibold text-slate-700 font-mono text-[11px]">{player.parentPhone}</span>
+                  </div>
                 </div>
-                <div class="flex items-center space-x-1.5 space-x-reverse dir-rtl">
-                  <Phone class="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
-                  <span class="font-semibold text-slate-700 font-mono text-[11px]">{player.parentPhone}</span>
-                </div>
-              </div>
 
-              {/* الملاحظات الطبية التكتيكية */}
-              <div class="bg-slate-50 p-2.5 rounded-xl flex items-start space-x-2 space-x-reverse">
-                <Activity class="h-3.5 w-3.5 text-amber-600 mt-0.5 flex-shrink-0" />
-                <p class="text-[11px] text-slate-500 leading-normal">
-                  <span class="font-bold text-slate-700">الملف الطبي:</span>{' '}
-                  {player.medicalNotes || 'لا توجد محاذير طبية مسجلة.'}
-                </p>
+                <div class="bg-slate-50 p-2.5 rounded-xl flex items-start space-x-2 space-x-reverse">
+                  <Activity class="h-3.5 w-3.5 text-amber-600 mt-0.5 flex-shrink-0" />
+                  <p class="text-[11px] text-slate-500 leading-normal">
+                    <span class="font-bold text-slate-700">الملف الطبي:</span>{' '}
+                    {player.medicalNotes || 'لا توجد محاذير طبية مسجلة.'}
+                  </p>
+                </div>
               </div>
 
             </div>
@@ -369,7 +467,35 @@ export default function Players() {
         </div>
       )}
 
-    </div>
-  );
-}
-  
+      {/* --- نافذة تأكيد الحذف المخصصة والآمنة (Custom Delete Modal Overlay) --- */}
+      {isDeleteModalOpen && selectedPlayer && (
+        <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+          <div class="bg-white w-full max-w-sm rounded-2xl p-6 shadow-xl border border-slate-100 space-y-4 text-center animate-scale-up">
+            <div class="w-12 h-12 rounded-full bg-red-50 text-red-600 flex items-center justify-center mx-auto shadow-inner">
+              <AlertTriangle class="h-6 w-6" />
+            </div>
+            
+            <div class="space-y-1">
+              <h3 class="font-black text-base text-slate-900">هل أنت متأكد من حذف اللاعب؟</h3>
+              <p class="text-xs text-slate-500 leading-relaxed px-2">
+                سيتم حذف اللاعب <span class="font-bold text-slate-900">"{selectedPlayer.fullName}"</span> نهائياً وبشكل قطعي من خوادم الأكاديمية السحابية. لا يمكن التراجع عن هذا الإجراء لاحقاً.
+              </p>
+            </div>
+
+            <div class="flex space-x-3 space-x-reverse pt-2">
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={confirmDelete}
+                class="flex-1 py-2.5 bg-red-600 hover:bg-red-700 active:scale-[0.98] text-white font-bold text-xs rounded-xl flex items-center justify-center space-x-1.5 space-x-reverse shadow-sm shadow-red-200 transition-all disabled:opacity-50"
+              >
+                {submitting ? <Loader2 class="h-3.5 w-3.5 animate-spin" /> : <Trash2 class="h-3.5 w-3.5" />}
+                <span>{submitting ? 'جاري الحذف...' : 'نعم، احذف نهائياً'}</span>
+              </button>
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={() => {
+                  setIsDeleteModalOpen(false);
+                  setSelectedPlayer(null);
+ 
