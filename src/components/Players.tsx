@@ -224,12 +224,27 @@ export default function Players() {
 
   // دالة الحذف النهائي القطعي من قاعدة البيانات السحابية
   const handleConfirmDelete = async () => {
-    if (!playerToDelete || submitting) return;
-    setSubmitting(true);
+  alert("تم الضغط على نعم احذف");
 
-    try {
-      const playerDocRef = doc(db, 'players', playerToDelete.id);
-      await deleteDoc(playerDocRef);
+  if (!playerToDelete || submitting) return;
+
+  setSubmitting(true);
+
+  try {
+    const playerDocRef = doc(db, "players", playerToDelete.id);
+    await deleteDoc(playerDocRef);
+
+    alert("تم الحذف");
+
+    setIsDeleteModalOpen(false);
+    setPlayerToDelete(null);
+  } catch (error) {
+    console.error(error);
+    alert("خطأ بالحذف");
+  } finally {
+    setSubmitting(false);
+  }
+};
       
       // إغلاق النافذة وتصفير الحالة بعد النجاح
       setIsDeleteModalOpen(false);
