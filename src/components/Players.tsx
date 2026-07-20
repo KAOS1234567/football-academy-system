@@ -156,9 +156,14 @@ export default function Players() {
 
   // تفعيل واجهة الحذف الآمن للاعب المختار
   const startDelete = (player: Player) => {
-    setPlayerToDelete(player);
+  alert(player.fullName);
+
+  setPlayerToDelete(player);
+
+  setTimeout(() => {
     setIsDeleteModalOpen(true);
-  };
+  }, 100);
+};
 
   // دالة حفظ لاعب جديد في Firestore
   const handleAddSubmit = async (e: React.FormEvent) => {
