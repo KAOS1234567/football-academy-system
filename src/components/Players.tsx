@@ -5,8 +5,7 @@ import {
   addDoc, 
   doc, 
   getDoc, 
-  updateDoc,
-  deleteDoc,
+  updateDoc, 
   query, 
   where, 
   onSnapshot, 
@@ -20,14 +19,11 @@ import {
   Calendar, 
   Phone, 
   Activity, 
-  ShieldCheck, 
   Loader2, 
-  Edit2, 
-  Trash2, 
-  AlertTriangle 
+  Edit2 
 } from 'lucide-react';
 
-// واجهة تعريف بيانات اللاعب برمجياً للـ TypeScript
+// تعريف الواجهة البرمجية لبيانات اللاعب لضمان مطابقة TypeScript
 interface Player {
   id: string;
   fullName: string;
@@ -53,11 +49,10 @@ export default function Players() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   
-  // حالات التحكم في اللاعب المختار والحذف
+  // حالة الاحتفاظ باللاعب الجاري تعديله حالياً
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
-  // حالة استمارة الإدخال والتعديل
+  // حالة استمارة الإدخال والتعديل الموحدة
   const [formData, setFormData] = useState({
     fullName: '',
     birthDate: '',
@@ -66,7 +61,7 @@ export default function Players() {
     medicalNotes: ''
   });
 
-  // جلب سياق الأكاديمية وإعداد المستمع اللحظي للاعبين
+  // جلب سياق الأكاديمية وإعداد المستمع اللحظي للاعبين المسجلين
   useEffect(() => {
     let unsubscribePlayers: (() => void) | null = null;
 
@@ -78,7 +73,6 @@ export default function Players() {
           return;
         }
 
-        // جلب معرف الأكاديمية الخاص بالمدرب الحالي
         const userDocRef = doc(db, 'users', currentUser.uid);
         const userDocSnap = await getDoc(userDocRef);
 
@@ -88,13 +82,11 @@ export default function Players() {
           setAcademyId(currentAcademyId);
 
           if (currentAcademyId) {
-            // إعداد استعلام مراقبة اللاعبين التابعين لهذه الأكاديمية فقط
             const q = query(
               collection(db, 'players'),
               where('academyId', '==', currentAcademyId)
             );
 
-            // الاستماع اللحظي للتغيرات في Firestore
             unsubscribePlayers = onSnapshot(q, (snapshot) => {
               const fetchedPlayers: Player[] = [];
               snapshot.forEach((doc) => {
@@ -104,7 +96,7 @@ export default function Players() {
                 } as Player);
               });
 
-              // ترتيب اللاعبين محلياً في الذاكرة لتجنب مشاكل الفهرسة المركبة حالياً
+              // ترتيب زمني محلي للحفاظ على استقرار الواجهة
               fetchedPlayers.sort((a, b) => {
                 const timeA = a.createdAt?.seconds || 0;
                 const timeB = b.createdAt?.seconds || 0;
@@ -131,19 +123,18 @@ export default function Players() {
 
     initializeContext();
 
-    // تنظيف المستمع عند الخروج لحماية موارد النطاق الترددي
     return () => {
       if (unsubscribePlayers) unsubscribePlayers();
     };
   }, []);
 
-  // دالة تحديث قيم الحقول ديناميكياً
+  // تحديث مدخلات الاستمارة ديناميكياً
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  // الانتقال لوضع التعديل وحقن البيانات الحالية للاعب
+  // تشغيل وضع التعديل وحقن البيانات الحالية للاعب المختار
   const startEdit = (player: Player) => {
     setSelectedPlayer(player);
     setFormData({
@@ -154,12 +145,6 @@ export default function Players() {
       medicalNotes: player.medicalNotes
     });
     setView('edit');
-  };
-
-  // فتح نافذة تأكيد الحذف المخصصة للأمان
-  const startDelete = (player: Player) => {
-    setSelectedPlayer(player);
-    setIsDeleteModalOpen(true);
   };
 
   // دالة حفظ لاعب جديد في Firestore
@@ -190,7 +175,7 @@ export default function Players() {
     }
   };
 
-  // دالة تحديث بيانات اللاعب الحالية
+  // دالة إرسال التحديثات لبيانات لاعب موجود مسبقاً إلى Firestore
   const handleUpdateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedPlayer || submitting) return;
@@ -207,37 +192,19 @@ export default function Players() {
         updatedAt: serverTimestamp()
       });
 
+      // تنظيف وإعادة ضبط الحالات بعد النجاح السحابي
       setFormData({ fullName: '', birthDate: '', position: '', parentPhone: '', medicalNotes: '' });
       setSelectedPlayer(null);
       setView('list');
     } catch (error) {
       console.error("Error updating player:", error);
-      alert("حدث خطأ أثناء تحديث بيانات اللاعب.");
+      alert("حدث خطأ أثناء تحديث بيانات اللاعب، يرجى المحاولة لاحقاً.");
     } finally {
       setSubmitting(false);
     }
   };
 
-  // دالة الحذف النهائية القطعية من السحابة
-  const confirmDelete = async () => {
-    if (!selectedPlayer || submitting) return;
-    setSubmitting(true);
-
-    try {
-      const playerDocRef = doc(db, 'players', selectedPlayer.id);
-      await deleteDoc(playerDocRef);
-      
-      setIsDeleteModalOpen(false);
-      setSelectedPlayer(null);
-    } catch (error) {
-      console.error("Error deleting player:", error);
-      alert("حدث خطأ أثناء حذف اللاعب.");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  // شاشة التحميل اللحظية لحين جلب البيانات سحابياً
+  // شاشة التحميل الدوارة لحين اكتمال الـ Handshake السحابي
   if (loading) {
     return (
       <div className="py-12 flex flex-col items-center justify-center space-y-3">
@@ -247,9 +214,10 @@ export default function Players() {
     );
   }
 
-  // --- شاشات الإدخال والتعديل المتجاوبة ---
+  // --- شاشة نموذج إضافة وتعديل اللاعب الموحدة (DRY UI Construction) ---
   if (view === 'add' || view === 'edit') {
     const isEditMode = view === 'edit';
+    
     return (
       <div className="space-y-6 animate-fade-in pb-12">
         
@@ -271,7 +239,7 @@ export default function Players() {
               {isEditMode ? `تعديل بيانات: ${selectedPlayer?.fullName}` : 'إضافة لاعب جديد للأكاديمية'}
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
-              {isEditMode ? 'تعديل الحقول المطلوبة واضغط حفظ لتحديث قاعدة البيانات فوراً.' : 'سيتم تخزين هذا اللاعب بأمان تحت الهوية البرمجية لأكاديميتك.'}
+              {isEditMode ? 'تعديل الحقول المطلوبة ثم اضغط تحديث لحفظ التعديلات سحابياً فوراً.' : 'سيتم تخزين هذا اللاعب بأمان تحت الهوية البرمجية لأكاديميتك.'}
             </p>
           </div>
         </div>
@@ -359,7 +327,7 @@ export default function Players() {
               className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white font-bold text-sm rounded-xl flex items-center justify-center space-x-2 space-x-reverse shadow-sm shadow-emerald-200 transition-all disabled:opacity-70 disabled:pointer-events-none"
             >
               {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              <span>{submitting ? 'جاري الحفظ...' : isEditMode ? 'تحديث البيانات سحابياً' : 'حفظ وتخزين اللاعب'}</span>
+              <span>{submitting ? 'جاري الحفظ سحابياً...' : isEditMode ? 'تحديث بيانات اللاعب' : 'حفظ وتخزين اللاعب'}</span>
             </button>
             <button 
               type="button"
@@ -381,7 +349,7 @@ export default function Players() {
     );
   }
 
-  // --- شاشة العرض الرئيسية لقائمة اللاعبين والبطاقات التكتيكية ---
+  // --- شاشة العرض الرئيسية لقائمة بطاقات اللاعبين (Main Dashboard List) ---
   return (
     <div className="space-y-6 animate-fade-in relative">
       
@@ -440,22 +408,14 @@ export default function Players() {
                     </span>
                   </div>
                   
-                  <div className="flex items-center space-x-1 space-x-reverse">
-                    <button 
-                      onClick={() => startEdit(player)}
-                      className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
-                      title="تعديل بيانات اللاعب"
-                    >
-                      <Edit2 className="h-4 w-4" />
-                    </button>
-                    <button 
-                      onClick={() => startDelete(player)}
-                      className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
-                      title="حذف اللاعب نهائياً"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
+                  {/* زر التعديل المخصص والمتجاوب بصرياً مع الهواتف */}
+                  <button 
+                    onClick={() => startEdit(player)}
+                    className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
+                    title="تعديل بيانات اللاعب"
+                  >
+                    <Edit2 className="h-4 w-4" />
+                  </button>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 border-t border-b border-slate-50 py-3 text-xs text-slate-600">
@@ -483,15 +443,7 @@ export default function Players() {
         </div>
       )}
 
-      {/* --- نافذة تأكيد الحذف المخصصة والآمنة (Custom Delete Modal Overlay) --- */}
-      {isDeleteModalOpen && selectedPlayer && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white w-full max-w-sm rounded-2xl p-6 shadow-xl border border-slate-100 space-y-4 text-center animate-scale-up">
-            <div className="w-12 h-12 rounded-full bg-red-50 text-red-600 flex items-center justify-center mx-auto shadow-inner">
-              <AlertTriangle className="h-6 w-6" />
-            </div>
-            
-            <div className="space-y-1">
-              <h3 className="font-black text-base text-slate-900">هل أنت متأكد من حذف اللاعب؟</h3>
-              <p className="text-xs text-slate-500 leading-relaxed px-2">
-                سيتم حذف اللاعب <span className="font-bold text-slate-900">"{selectedPlayer.fullName}"</span> نهائياً وبشكل قطعي من خوادم الأكاديمية السحابية. لا يمكن التراجع عن ه
+    </div>
+  );
+        }
+    
