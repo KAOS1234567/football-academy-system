@@ -247,28 +247,7 @@ export default function Players() {
 };
       
       // إغلاق النافذة وتصفير الحالة بعد النجاح
-      const handleConfirmDelete = async () => {
-  alert("تم الضغط على نعم احذف");
-
-  if (!playerToDelete || submitting) return;
-
-  setSubmitting(true);
-
-  try {
-    const playerDocRef = doc(db, "players", playerToDelete.id);
-    await deleteDoc(playerDocRef);
-
-    alert("تم الحذف");
-
-    setIsDeleteModalOpen(false);
-    setPlayerToDelete(null);
-  } catch (error) {
-    console.error(error);
-    alert("خطأ بالحذف");
-  } finally {
-    setSubmitting(false);
-  }
-};
+      
 
   // شاشة التحميل الدوارة لحين اكتمال الـ Handshake السحابي
   if (loading) {
