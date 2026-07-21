@@ -156,7 +156,9 @@ export default function Players() {
 
   // تفعيل واجهة الحذف الآمن للاعب المختار
   const startDelete = (player: Player) => {
-  alert(player.fullName);
+  setPlayerToDelete(player);
+  setIsDeleteModalOpen(true);
+};
 
   setPlayerToDelete(player);
 
