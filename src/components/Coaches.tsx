@@ -6,7 +6,7 @@ import {
   doc, 
   getDoc, 
   updateDoc, 
-  deleteDoc,
+  deleteDoc, 
   query, 
   where, 
   onSnapshot, 
@@ -22,12 +22,11 @@ import {
   Clock, 
   Activity, 
   Loader2, 
-  Edit2,
-  Trash2,
-  AlertTriangle
+  Edit2, 
+  Trash2, 
+  AlertTriangle 
 } from 'lucide-react';
 
-// تعريف الواجهة البرمجية لبيانات المدرب لضمان مطابقة TypeScript
 interface Coach {
   id: string;
   fullName: string;
@@ -38,16 +37,15 @@ interface Coach {
   experience: string | number;
   notes: string;
   status: 'active' | 'inactive';
-  createdAt: any;
+  createdAt?: any;
 }
 
-// قاموس لترجمة التخصصات التدريبية للعربية في الواجهة
-const specializationTranslations: Record<string, string> = {
-  HeadCoach: 'مدرب رئيسي (Head Coach)',
-  AssistantCoach: 'مدرب مساعد (Assistant Coach)',
-  GoalkeeperCoach: 'مدرب حراس مرمى (GK Coach)',
-  FitnessCoach: 'مدرب لياقة بدنية (Fitness Coach)',
-  YouthCoach: 'مدرب فئات عمرية (Youth Coach)',
+const specNames: Record<string, string> = {
+  HeadCoach: 'مدرب رئيسي',
+  AssistantCoach: 'مدرب مساعد',
+  GoalkeeperCoach: 'مدرب حراس',
+  FitnessCoach: 'مدرب لياقة',
+  YouthCoach: 'مدرب فئات عمرية',
 };
 
 export default function Coaches() {
@@ -56,15 +54,10 @@ export default function Coaches() {
   const [coaches, setCoaches] = useState<Coach[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  
-  // حالة الاحتفاظ بالمدرب الجاري تعديله حالياً
   const [selectedCoach, setSelectedCoach] = useState<Coach | null>(null);
-
-  // حالات إدارة ميزة الحذف الآمن
   const [coachToDelete, setCoachToDelete] = useState<Coach | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
-  // حالة استمارة الإدخال والتعديل الموحدة
   const [formData, setFormData] = useState({
     fullName: '',
     phone: '',
@@ -76,364 +69,172 @@ export default function Coaches() {
     status: 'active' as 'active' | 'inactive'
   });
 
-  // جلب سياق الأكاديمية وإعداد المستمع اللحظي للمدربين المسجلين
   useEffect(() => {
-    let unsubscribeCoaches: (() => void) | null = null;
-
-    async function initializeContext() {
+    let unsub: (() => void) | null = null;
+    async function init() {
       try {
-        const currentUser = auth.currentUser;
-        if (!currentUser) {
-          setLoading(false);
-          return;
-        }
-
-        const userDocRef = doc(db, 'users', currentUser.uid);
-        const userDocSnap = await getDoc(userDocRef);
-
-        if (userDocSnap.exists()) {
-          const uData = userDocSnap.data();
-          const currentAcademyId = uData?.academyId || null;
-          setAcademyId(currentAcademyId);
-
-          if (currentAcademyId) {
-            const q = query(
-              collection(db, 'coaches'),
-              where('academyId', '==', currentAcademyId)
-            );
-
-            unsubscribeCoaches = onSnapshot(q, (snapshot) => {
-              const fetchedCoaches: Coach[] = [];
-              snapshot.forEach((docSnap) => {
-                fetchedCoaches.push({
-                  id: docSnap.id,
-                  ...docSnap.data()
-                } as Coach);
-              });
-
-              // ترتيب زمني محلي للحفاظ على استقرار الواجهة
-              fetchedCoaches.sort((a, b) => {
-                const timeA = a.createdAt?.seconds || 0;
-                const timeB = b.createdAt?.seconds || 0;
-                return timeB - timeA;
-              });
-
-              setCoaches(fetchedCoaches);
+        const user = auth.currentUser;
+        if (!user) { setLoading(false); return; }
+        const uSnap = await getDoc(doc(db, 'users', user.uid));
+        if (uSnap.exists()) {
+          const accId = uSnap.data()?.academyId || null;
+          setAcademyId(accId);
+          if (accId) {
+            const q = query(collection(db, 'coaches'), where('academyId', '==', accId));
+            unsub = onSnapshot(q, (snap) => {
+              const list: Coach[] = [];
+              snap.forEach((d) => list.push({ id: d.id, ...d.data() } as Coach));
+              list.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+              setCoaches(list);
               setLoading(false);
-            }, (error) => {
-              console.error("Firestore subscription error:", error);
-              setLoading(false);
-            });
-          } else {
-            setLoading(false);
-          }
-        } else {
-          setLoading(false);
-        }
-      } catch (error) {
-        console.error("Error initializing coaches context:", error);
-        setLoading(false);
-      }
+            }, () => setLoading(false));
+          } else { setLoading(false); }
+        } else { setLoading(false); }
+      } catch { setLoading(false); }
     }
-
-    initializeContext();
-
-    return () => {
-      if (unsubscribeCoaches) unsubscribeCoaches();
-    };
+    init();
+    return () => { if (unsub) unsub(); };
   }, []);
 
-  // تحديث مدخلات الاستمارة ديناميكياً
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  // تشغيل وضع التعديل وحقن البيانات الحالية للمدرب المختار
-  const startEdit = (coach: Coach) => {
-    setSelectedCoach(coach);
+  const startEdit = (c: Coach) => {
+    setSelectedCoach(c);
     setFormData({
-      fullName: coach.fullName,
-      phone: coach.phone,
-      email: coach.email,
-      specialization: coach.specialization,
-      license: coach.license,
-      experience: String(coach.experience),
-      notes: coach.notes || '',
-      status: coach.status || 'active'
+      fullName: c.fullName,
+      phone: c.phone,
+      email: c.email,
+      specialization: c.specialization,
+      license: c.license,
+      experience: String(c.experience),
+      notes: c.notes || '',
+      status: c.status || 'active'
     });
     setView('edit');
   };
 
-  // تفعيل واجهة الحذف الآمن للمدرب المختار
-  const startDelete = (coach: Coach) => {
-    setCoachToDelete(coach);
-    setIsDeleteModalOpen(true);
-  };
-
-  // دالة حفظ مدرب جديد في Firestore
-  const handleAddSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!academyId || submitting) return;
     setSubmitting(true);
-
     try {
-      await addDoc(collection(db, 'coaches'), {
-        fullName: formData.fullName.trim(),
-        phone: formData.phone.trim(),
-        email: formData.email.trim(),
-        specialization: formData.specialization,
-        license: formData.license.trim(),
-        experience: Number(formData.experience) || 0,
-        notes: formData.notes.trim(),
-        status: formData.status,
-        academyId: academyId,
-        createdBy: auth.currentUser?.uid,
-        createdAt: serverTimestamp()
-      });
-
-      setFormData({ fullName: '', phone: '', email: '', specialization: '', license: '', experience: '', notes: '', status: 'active' });
-      setView('list');
-    } catch (error) {
-      console.error("Error adding coach:", error);
-      alert("حدث خطأ أثناء حفظ بيانات المدرب.");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  // دالة إرسال التحديثات لبيانات مدرب موجود مسبقاً إلى Firestore
-  const handleUpdateSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedCoach || submitting) return;
-    setSubmitting(true);
-
-    try {
-      const coachDocRef = doc(db, 'coaches', selectedCoach.id);
-      await updateDoc(coachDocRef, {
-        fullName: formData.fullName.trim(),
-        phone: formData.phone.trim(),
-        email: formData.email.trim(),
-        specialization: formData.specialization,
-        license: formData.license.trim(),
-        experience: Number(formData.experience) || 0,
-        notes: formData.notes.trim(),
-        status: formData.status,
-        updatedAt: serverTimestamp()
-      });
-
+      if (view === 'edit' && selectedCoach) {
+        await updateDoc(doc(db, 'coaches', selectedCoach.id), {
+          ...formData,
+          experience: Number(formData.experience) || 0,
+          updatedAt: serverTimestamp()
+        });
+      } else {
+        await addDoc(collection(db, 'coaches'), {
+          ...formData,
+          experience: Number(formData.experience) || 0,
+          academyId,
+          createdBy: auth.currentUser?.uid,
+          createdAt: serverTimestamp()
+        });
+      }
       setFormData({ fullName: '', phone: '', email: '', specialization: '', license: '', experience: '', notes: '', status: 'active' });
       setSelectedCoach(null);
       setView('list');
-    } catch (error) {
-      console.error("Error updating coach:", error);
-      alert("حدث خطأ أثناء تحديث بيانات المدرب، يرجى المحاولة لاحقاً.");
+    } catch (err) {
+      alert("حدث خطأ أثناء حفظ البيانات");
     } finally {
       setSubmitting(false);
     }
   };
 
-  // دالة الحذف النهائي القطعي من قاعدة البيانات السحابية
-  const handleConfirmDelete = async () => {
+  const confirmDelete = async () => {
     if (!coachToDelete || submitting) return;
     setSubmitting(true);
-
     try {
-      const coachDocRef = doc(db, 'coaches', coachToDelete.id);
-      await deleteDoc(coachDocRef);
-      
+      await deleteDoc(doc(db, 'coaches', coachToDelete.id));
       setIsDeleteModalOpen(false);
       setCoachToDelete(null);
-    } catch (error) {
-      console.error("Error deleting coach:", error);
-      alert("حدث خطأ غير متوقع أثناء محاولة حذف المدرب، يرجى التحقق من اتصال الشبكة.");
+    } catch {
+      alert("حدث خطأ أثناء الحذف");
     } finally {
       setSubmitting(false);
     }
   };
 
-  // شاشة التحميل الدوارة لحين اكتمال الاتصال السحابي
   if (loading) {
     return (
-      <div className="py-12 flex flex-col items-center justify-center space-y-3">
+      <div className="py-12 flex justify-center items-center">
         <Loader2 className="h-8 w-8 text-emerald-600 animate-spin" />
-        <p className="text-xs text-slate-500 font-semibold">جاري جلب قائمة طاقم التدريب من السحابة...</p>
       </div>
     );
   }
 
-  // شاشة نموذج إضافة وتعديل المدرب الموحدة
   if (view === 'add' || view === 'edit') {
-    const isEditMode = view === 'edit';
-    
     return (
-      <div className="space-y-6 animate-fade-in pb-12">
-        <div className="flex items-center space-x-3 space-x-reverse border-b border-slate-100 pb-4">
-          <button 
-            type="button"
-            onClick={() => {
-              setView('list');
-              setSelectedCoach(null);
-              setFormData({ fullName: '', phone: '', email: '', specialization: '', license: '', experience: '', notes: '', status: 'active' });
-            }} 
-            className="p-2 bg-white rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
-            title="رجوع"
-          >
+      <div className="space-y-6 pb-12">
+        <div className="flex items-center space-x-3 space-x-reverse border-b pb-4">
+          <button onClick={() => { setView('list'); setSelectedCoach(null); }} className="p-2 bg-white rounded-xl border text-slate-600">
             <ArrowRight className="h-5 w-5" />
           </button>
-          <div>
-            <h2 className="text-lg font-black text-slate-900">
-              {isEditMode ? `تعديل بيانات المدرب: ${selectedCoach?.fullName}` : 'إضافة مدرب جديد للأكاديمية'}
-            </h2>
-            <p className="text-xs text-slate-500 mt-0.5">
-              {isEditMode ? 'تعديل الحقول المطلوبة ثم اضغط تحديث لحفظ التعديلات سحابياً.' : 'سيتم تخزين بيانات المدرب بأمان تحت الهوية البرمجية لأكاديميتك.'}
-            </p>
-          </div>
+          <h2 className="text-lg font-black">{view === 'edit' ? 'تعديل مدرب' : 'إضافة مدرب جديد'}</h2>
         </div>
 
-        <form onSubmit={isEditMode ? handleUpdateSubmit : handleAddSubmit} className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm space-y-4">
-          <div className="space-y-1">
-            <label className="text-xs font-bold text-slate-700 block">الاسم الكامل للمدرب *</label>
-            <input 
-              type="text"
-              name="fullName"
-              required
-              disabled={submitting}
-              value={formData.fullName}
-              onChange={handleInputChange}
-              placeholder="مثال: الكابتن محمد جاسم"
-              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-right disabled:opacity-50"
-            />
+        <form onSubmit={handleSubmit} className="bg-white rounded-2xl p-5 border space-y-4">
+          <div>
+            <label className="text-xs font-bold block mb-1">الاسم الكامل *</label>
+            <input type="text" name="fullName" required value={formData.fullName} onChange={handleChange} className="w-full p-3 bg-slate-50 border rounded-xl text-sm" />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-700 block">رقم الهاتف *</label>
-              <input 
-                type="tel"
-                name="phone"
-                required
-                disabled={submitting}
-                value={formData.phone}
-                onChange={handleInputChange}
-                placeholder="مثال: 077XXXXXXXX"
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-left dir-ltr placeholder:text-right disabled:opacity-50"
-              />
+            <div>
+              <label className="text-xs font-bold block mb-1">رقم الهاتف *</label>
+              <input type="tel" name="phone" required value={formData.phone} onChange={handleChange} className="w-full p-3 bg-slate-50 border rounded-xl text-sm dir-ltr text-left" />
             </div>
-
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-700 block">البريد الإلكتروني *</label>
-              <input 
-                type="email"
-                name="email"
-                required
-                disabled={submitting}
-                value={formData.email}
-                onChange={handleInputChange}
-                placeholder="coach@academy.com"
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-left dir-ltr placeholder:text-right disabled:opacity-50"
-              />
+            <div>
+              <label className="text-xs font-bold block mb-1">البريد الإلكتروني *</label>
+              <input type="email" name="email" required value={formData.email} onChange={handleChange} className="w-full p-3 bg-slate-50 border rounded-xl text-sm dir-ltr text-left" />
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-700 block">التخصص التدريبي *</label>
-              <select 
-                name="specialization"
-                required
-                disabled={submitting}
-                value={formData.specialization}
-                onChange={handleInputChange}
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-right appearance-none disabled:opacity-50"
-              >
+            <div>
+              <label className="text-xs font-bold block mb-1">التخصص *</label>
+              <select name="specialization" required value={formData.specialization} onChange={handleChange} className="w-full p-3 bg-slate-50 border rounded-xl text-sm">
                 <option value="">اختر التخصص...</option>
                 <option value="HeadCoach">مدرب رئيسي</option>
                 <option value="AssistantCoach">مدرب مساعد</option>
-                <option value="GoalkeeperCoach">مدرب حراس مرمى</option>
-                <option value="FitnessCoach">مدرب لياقة بدنية</option>
+                <option value="GoalkeeperCoach">مدرب حراس</option>
+                <option value="FitnessCoach">مدرب لياقة</option>
                 <option value="YouthCoach">مدرب فئات عمرية</option>
               </select>
             </div>
-
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-700 block">الرخصة التدريبية *</label>
-              <input 
-                type="text"
-                name="license"
-                required
-                disabled={submitting}
-                value={formData.license}
-                onChange={handleInputChange}
-                placeholder="مثال: AFC Pro / UEFA A"
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-right disabled:opacity-50"
-              />
+            <div>
+              <label className="text-xs font-bold block mb-1">الرخصة *</label>
+              <input type="text" name="license" required value={formData.license} onChange={handleChange} placeholder="مثال: AFC A" className="w-full p-3 bg-slate-50 border rounded-xl text-sm" />
             </div>
-
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-700 block">سنوات الخبرة *</label>
-              <input 
-                type="number"
-                name="experience"
-                min="0"
-                max="50"
-                required
-                disabled={submitting}
-                value={formData.experience}
-                onChange={handleInputChange}
-                placeholder="مثال: 5"
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-right disabled:opacity-50"
-              />
+            <div>
+              <label className="text-xs font-bold block mb-1">سنوات الخبرة *</label>
+              <input type="number" name="experience" required value={formData.experience} onChange={handleChange} className="w-full p-3 bg-slate-50 border rounded-xl text-sm" />
             </div>
           </div>
 
-          <div className="space-y-1">
-            <label className="text-xs font-bold text-slate-700 block">حالة المدرب *</label>
-            <select 
-              name="status"
-              required
-              disabled={submitting}
-              value={formData.status}
-              onChange={handleInputChange}
-              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-right appearance-none disabled:opacity-50"
-            >
-              <option value="active">نشط (Active)</option>
-              <option value="inactive">غير نشط (Inactive)</option>
+          <div>
+            <label className="text-xs font-bold block mb-1">الحالة *</label>
+            <select name="status" value={formData.status} onChange={handleChange} className="w-full p-3 bg-slate-50 border rounded-xl text-sm">
+              <option value="active">نشط</option>
+              <option value="inactive">غير نشط</option>
             </select>
           </div>
 
-          <div className="space-y-1">
-            <label className="text-xs font-bold text-slate-700 block">ملاحظات إضافية (إن وجدت)</label>
-            <textarea 
-              name="notes"
-              rows={3}
-              disabled={submitting}
-              value={formData.notes}
-              onChange={handleInputChange}
-              placeholder="مثال: مسؤول عن الفئات العمرية تحت 16 سنة..."
-              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-right resize-none disabled:opacity-50"
-            ></textarea>
+          <div>
+            <label className="text-xs font-bold block mb-1">ملاحظات</label>
+            <textarea name="notes" rows={2} value={formData.notes} onChange={handleChange} className="w-full p-3 bg-slate-50 border rounded-xl text-sm resize-none"></textarea>
           </div>
 
-          <div className="pt-2 flex space-x-3 space-x-reverse">
-            <button 
-              type="submit"
-              disabled={submitting}
-              className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white font-bold text-sm rounded-xl flex items-center justify-center space-x-2 space-x-reverse shadow-sm shadow-emerald-200 transition-all disabled:opacity-70 disabled:pointer-events-none"
-            >
+          <div className="flex space-x-3 space-x-reverse pt-2">
+            <button type="submit" disabled={submitting} className="flex-1 py-3 bg-emerald-600 text-white font-bold text-sm rounded-xl flex items-center justify-center space-x-2 space-x-reverse">
               {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              <span>{submitting ? 'جاري الحفظ سحابياً...' : isEditMode ? 'تحديث بيانات المدرب' : 'حفظ وتخزين المدرب'}</span>
+              <span>{submitting ? 'جاري الحفظ...' : 'حفظ البيانات'}</span>
             </button>
-            <button 
-              type="button"
-              disabled={submitting}
-              onClick={() => {
-                setView('list');
-                setSelectedCoach(null);
-                setFormData({ fullName: '', phone: '', email: '', specialization: '', license: '', experience: '', notes: '', status: 'active' });
-              }}
-              className="px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-sm rounded-xl transition-colors disabled:opacity-50"
-            >
+            <button type="button" onClick={() => { setView('list'); setSelectedCoach(null); }} className="px-4 py-3 bg-slate-100 text-slate-600 font-bold text-sm rounded-xl">
               إلغاء
             </button>
           </div>
@@ -442,58 +243,82 @@ export default function Coaches() {
     );
   }
 
-  // شاشة العرض الرئيسية لقائمة بطاقات المدربين
   return (
-    <div className="space-y-6 animate-fade-in relative">
-      <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+    <div className="space-y-6 relative">
+      <div className="flex items-center justify-between border-b pb-4">
         <div>
-          <h2 className="text-xl font-black text-slate-900">إدارة المدربين</h2>
-          <p className="text-xs text-slate-500 mt-1">
-            إجمالي المدربين المسجلين حياً: <span className="text-emerald-600 font-bold font-mono">{coaches.length}</span>
-          </p>
+          <h2 className="text-xl font-black">إدارة المدربين</h2>
+          <p className="text-xs text-slate-500">العدد: {coaches.length}</p>
         </div>
-        {coaches.length > 0 && (
-          <button 
-            onClick={() => setView('add')}
-            className="py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center space-x-1.5 space-x-reverse shadow-sm shadow-emerald-100 transition-all"
-          >
-            <UserPlus className="h-3.5 w-3.5" />
-            <span>إضافة مدرب</span>
-          </button>
-        )}
+        <button onClick={() => setView('add')} className="py-2.5 px-4 bg-emerald-600 text-white font-bold text-xs rounded-xl flex items-center space-x-1.5 space-x-reverse">
+          <UserPlus className="h-4 w-4" />
+          <span>إضافة مدرب</span>
+        </button>
       </div>
 
       {coaches.length === 0 ? (
-        <div className="bg-white rounded-2xl p-8 border border-slate-100 shadow-sm text-center max-w-md mx-auto my-8 space-y-4">
-          <div className="w-16 h-16 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto shadow-sm shadow-emerald-100">
-            <Award className="h-8 w-8" />
-          </div>
-          <div className="space-y-1">
-            <h3 className="font-bold text-base text-slate-900">لا يوجد مدربين مسجلين بعد</h3>
-            <p className="text-slate-500 text-xs leading-relaxed px-4">
-              قائمة طاقم التدريب فارغة. أضف المدرب الأول لبدء توزيع المهام الفنية.
-            </p>
-          </div>
-          <button 
-            onClick={() => setView('add')}
-            className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl flex items-center justify-center space-x-2 space-x-reverse shadow-sm shadow-emerald-100 transition-all"
-          >
-            <UserPlus className="h-4 w-4" />
-            <span>إضافة أول مدرب الآن</span>
-          </button>
+        <div className="bg-white rounded-2xl p-8 border text-center space-y-4 max-w-md mx-auto">
+          <Award className="h-10 w-10 text-emerald-600 mx-auto" />
+          <p className="text-xs text-slate-500">لا يوجد مدربين مسجلين بعد.</p>
+          <button onClick={() => setView('add')} className="w-full py-3 bg-emerald-600 text-white font-bold text-sm rounded-xl">إضافة أول مدرب</button>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {coaches.map((coach) => (
-            <div 
-              key={coach.id} 
-              className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm space-y-4 hover:border-slate-200 transition-all relative overflow-hidden flex flex-col justify-between"
-            >
-              <div className={`absolute top-0 left-0 bottom-0 w-1.5 ${coach.status === 'inactive' ? 'bg-amber-400' : 'bg-emerald-500'}`}></div>
+          {coaches.map((c) => (
+            <div key={c.id} className="bg-white p-5 rounded-2xl border space-y-3 relative overflow-hidden">
+              <div className={`absolute top-0 left-0 bottom-0 w-1.5 ${c.status === 'inactive' ? 'bg-amber-400' : 'bg-emerald-500'}`}></div>
+              
+              <div className="flex items-start justify-between">
+                <div>
+                  <h4 className="font-bold text-base text-slate-900">{c.fullName}</h4>
+                  <span className="inline-block bg-slate-100 text-slate-600 px-2 py-0.5 rounded text-[10px] font-bold mt-1">
+                    {specNames[c.specialization] || c.specialization}
+                  </span>
+                </div>
+                <div className="flex space-x-1 space-x-reverse">
+                  <button onClick={() => startEdit(c)} className="p-2 text-slate-400 hover:text-emerald-600"><Edit2 className="h-4 w-4" /></button>
+                  <button onClick={() => { setCoachToDelete(c); setIsDeleteModalOpen(true); }} className="p-2 text-slate-400 hover:text-red-600"><Trash2 className="h-4 w-4" /></button>
+                </div>
+              </div>
 
-              <div className="space-y-3">
-                <div className="flex items-start justify-between">
-                  <div className="space-y-1">
-                    <div className="flex items-center space-x-2 space-x-reverse">
-                      <h4 className="font-bold text-base text-slate-900">{coach.fullName}</h4>
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${coach.status === 'inactive' ? 'bg-amber-50 text-amber-600 borde
+              <div className="border-t border-b py-2 text-xs space-y-1 text-slate-600">
+                <div className="flex items-center space-x-2 space-x-reverse"><Phone className="h-3.5 w-3.5" /><span>{c.phone}</span></div>
+                <div className="flex items-center space-x-2 space-x-reverse dir-ltr justify-end"><Mail className="h-3.5 w-3.5" /><span className="truncate">{c.email}</span></div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 bg-slate-50 p-2 rounded-xl text-[11px]">
+                <div className="flex items-center space-x-1 space-x-reverse"><Award className="h-3.5 w-3.5 text-emerald-600" /><span>الرخصة: <strong>{c.license}</strong></span></div>
+                <div className="flex items-center space-x-1 space-x-reverse"><Clock className="h-3.5 w-3.5 text-indigo-600" /><span>الخبرة: <strong>{c.experience} سنة</strong></span></div>
+              </div>
+
+              {c.notes && (
+                <div className="flex items-center space-x-1 space-x-reverse text-[11px] text-slate-500">
+                  <Activity className="h-3.5 w-3.5 text-amber-500" />
+                  <span className="truncate">{c.notes}</span>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {isDeleteModalOpen && coachToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-sm rounded-2xl p-6 text-center space-y-4">
+            <AlertTriangle className="h-8 w-8 text-red-600 mx-auto" />
+            <h3 className="font-bold text-base">تأكيد حذف المدرب؟</h3>
+            <p className="text-xs text-slate-500">سيتم حذف "{coachToDelete.fullName}" نهائياً من النظام.</p>
+            <div className="flex space-x-3 space-x-reverse">
+              <button onClick={confirmDelete} disabled={submitting} className="flex-1 py-2.5 bg-red-600 text-white font-bold text-xs rounded-xl">
+                {submitting ? 'جاري الحذف...' : 'نعم، احذف'}
+              </button>
+              <button onClick={() => { setIsDeleteModalOpen(false); setCoachToDelete(null); }} className="flex-1 py-2.5 bg-slate-100 text-slate-600 font-bold text-xs rounded-xl">
+                إلغاء
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
