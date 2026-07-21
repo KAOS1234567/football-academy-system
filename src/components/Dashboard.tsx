@@ -1,244 +1,245 @@
 import { useState, useEffect } from 'react';
-import { doc, getDoc } from 'firebase/firestore';
-import { signOut } from 'firebase/auth';
 import { auth, db } from '../firebase';
-import Players from './Players'; // استيراد مكون اللاعبين الجديد
+import { signOut } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
 import { 
   LayoutDashboard, 
   Users, 
-  UserSquare2, 
-  Calendar, 
+  Award, 
   LogOut, 
-  Copy, 
-  Check, 
-  Trophy,
-  ShieldCheck
+  Menu, 
+  X, 
+  ShieldCheck, 
+  ChevronLeft,
+  Activity,
+  TrendingUp
 } from 'lucide-react';
 
-interface UserData {
-  fullName: string;
-  email: string;
-  role: 'owner' | 'coach';
-  academyId: string;
-}
-
-interface AcademyData {
-  name: string;
-  inviteCode: string;
-}
+// استيراد الموديلات التشغيلية للأكاديمية
+import Players from './Players';
+import Coaches from './Coaches';
 
 export default function Dashboard() {
-  const [userData, setUserData] = useState<UserData | null>(null);
-  const [academyData, setAcademyData] = useState<AcademyData | null>(null);
+  const [activeTab, setActiveTab] = useState<'overview' | 'players' | 'coaches'>('overview');
+  const [academyName, setAcademyName] = useState<string>('جاري التحميل...');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [copied, setCopied] = useState(false);
-  const [activeTab, setActiveTab] = useState('home');
 
+  // جلب بيانات الأكاديمية الخاصة بالمدير المالك
   useEffect(() => {
-    async function fetchSaaSContext() {
+    async function fetchAcademyDetails() {
       try {
         const currentUser = auth.currentUser;
-        if (!currentUser) return;
-
-        const userDocRef = doc(db, 'users', currentUser.uid);
-        const userDocSnap = await getDoc(userDocRef);
-
-        if (userDocSnap.exists()) {
-          const uData = userDocSnap.data() as UserData;
-          setUserData(uData);
-
-          const academyDocRef = doc(db, 'academies', uData.academyId);
-          const academyDocSnap = await getDoc(academyDocRef);
-
-          if (academyDocSnap.exists()) {
-            setAcademyData(academyDocSnap.data() as AcademyData);
+        if (currentUser) {
+          const userDocSnap = await getDoc(doc(db, 'users', currentUser.uid));
+          if (userDocSnap.exists()) {
+            const data = userDocSnap.data();
+            setAcademyName(data.academyName || 'أكاديمية كرة القدم');
           }
         }
       } catch (error) {
-        console.error("Error loading dashboard data:", error);
+        console.error("Error fetching academy profile:", error);
+        setAcademyName('أكاديمية Apex');
       } finally {
         setLoading(false);
       }
     }
 
-    fetchSaaSContext();
+    fetchAcademyDetails();
   }, []);
 
-  const handleCopyCode = () => {
-    if (academyData?.inviteCode) {
-      navigator.clipboard.writeText(academyData.inviteCode);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+  // دالة تسجيل الخروج الآمن
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error("Error signing out:", error);
     }
   };
 
-  const handleLogout = () => {
-    signOut(auth);
-  };
-
-  if (loading) {
-    return (
-      <div class="min-h-screen flex items-center justify-center bg-slate-50 px-4">
-        <div class="w-full max-w-md space-y-4">
-          <div class="h-8 bg-slate-200 rounded-xl animate-pulse w-2/3 mx-auto"></div>
-          <div class="h-32 bg-slate-200 rounded-2xl animate-pulse"></div>
-          <div class="grid grid-cols-2 gap-4">
-            <div class="h-24 bg-slate-200 rounded-xl animate-pulse"></div>
-            <div class="h-24 bg-slate-200 rounded-xl animate-pulse"></div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // مصفوفة عناصر القائمة الموحدة لتسهيل الصيانة والتوسع المستقبلي
+  const navItems = [
+    { id: 'overview', label: 'الرئيسية', icon: LayoutDashboard },
+    { id: 'players', label: 'اللاعبين', icon: Users },
+    { id: 'coaches', label: 'المدربين', icon: Award },
+  ];
 
   return (
-    <div class="min-h-screen bg-slate-50 text-slate-900 pb-24 md:pb-0 md:pe-64 flex flex-col">
+    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row dir-rtl font-sans text-slate-800">
       
-      {/* القائمة الجانبية المستقرة للشاشات الكبيرة (Sidebar) */}
-      <aside class="fixed top-0 right-0 bottom-0 z-20 hidden md:flex flex-col w-64 bg-white border-e border-slate-100 p-4 space-y-6">
-        <div class="flex items-center space-x-2 space-x-reverse px-2 py-4">
-          <span class="text-2xl">⚽</span>
-          <span class="font-black text-xl text-slate-900">ApexAcademy</span>
+      {/* --- الشريط الجانبي للشاشات الكبيرة (Desktop Sidebar) --- */}
+      <aside className="hidden md:flex flex-col w-64 bg-slate-900 text-white border-l border-slate-800 p-5 space-y-8 flex-shrink-0">
+        
+        {/* الشعار واسم الأكاديمية */}
+        <div className="flex items-center space-x-3 space-x-reverse pt-2">
+          <div className="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center text-slate-950 font-black shadow-lg shadow-emerald-500/20">
+            <ShieldCheck className="h-6 w-6" />
+          </div>
+          <div className="overflow-hidden">
+            <h1 className="font-black text-base text-white truncate">ApexAcademy</h1>
+            <p className="text-[11px] text-emerald-400 font-semibold truncate">{academyName}</p>
+          </div>
         </div>
-        <nav class="flex-1 space-y-1">
-          <button onClick={() => setActiveTab('home')} class={`w-full flex items-center space-x-3 space-x-reverse px-4 py-3 rounded-xl text-sm font-bold transition-colors ${activeTab === 'home' ? 'bg-emerald-50 text-emerald-700' : 'text-slate-600 hover:bg-slate-50'}`}>
-            <LayoutDashboard class="h-5 w-5" />
-            <span>الرئيسية</span>
-          </button>
-          <button onClick={() => setActiveTab('players')} class={`w-full flex items-center space-x-3 space-x-reverse px-4 py-3 rounded-xl text-sm font-bold transition-colors ${activeTab === 'players' ? 'bg-emerald-50 text-emerald-700' : 'text-slate-600 hover:bg-slate-50'}`}>
-            <Users class="h-5 w-5" />
-            <span>اللاعبين</span>
-          </button>
-          <button onClick={() => setActiveTab('training')} class={`w-full flex items-center space-x-3 space-x-reverse px-4 py-3 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors ${activeTab === 'training' ? 'bg-emerald-50 text-emerald-700' : 'text-slate-600 hover:bg-slate-50'}`}>
-            <Calendar class="h-5 w-5" />
-            <span>التدريبات</span>
-          </button>
+
+        {/* عناصر التنقل */}
+        <nav className="flex-1 space-y-1.5">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = activeTab === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => setActiveTab(item.id as any)}
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl font-bold text-sm transition-all ${
+                  isActive 
+                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-900/30' 
+                    : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                }`}
+              >
+                <div className="flex items-center space-x-3 space-x-reverse">
+                  <Icon className="h-5 w-5" />
+                  <span>{item.label}</span>
+                </div>
+                {isActive && <ChevronLeft className="h-4 w-4 text-emerald-200" />}
+              </button>
+            );
+          })}
         </nav>
-        <button onClick={handleLogout} class="w-full flex items-center space-x-3 space-x-reverse px-4 py-3 rounded-xl text-sm font-bold text-red-600 hover:bg-red-50 transition-colors">
-          <LogOut class="h-5 w-5" />
-          <span>تسجيل الخروج</span>
-        </button>
+
+        {/* زر تسجيل الخروج */}
+        <div className="pt-4 border-t border-slate-800">
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center space-x-3 space-x-reverse px-4 py-3 rounded-xl font-bold text-sm text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-all"
+          >
+            <LogOut className="h-5 w-5" />
+            <span>تسجيل الخروج</span>
+          </button>
+        </div>
       </aside>
 
-      {/* الهيدر العلوي المتجاوب للهاتف */}
-      <header class="w-full bg-white border-b border-slate-100 sticky top-0 z-10 px-4 py-4 flex items-center justify-between">
-        <div class="flex items-center space-x-3 space-x-reverse">
-          <div class="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center text-white font-bold shadow-sm shadow-emerald-200">
-            {academyData?.name ? academyData.name.charAt(0) : 'A'}
+      {/* --- الهيدر العلوي للموبايل (Mobile Header) --- */}
+      <header className="md:hidden bg-slate-900 text-white p-4 flex items-center justify-between border-b border-slate-800 sticky top-0 z-40">
+        <div className="flex items-center space-x-3 space-x-reverse">
+          <div className="w-9 h-9 rounded-xl bg-emerald-500 flex items-center justify-center text-slate-950 font-black">
+            <ShieldCheck className="h-5 w-5" />
           </div>
           <div>
-            <h1 class="font-bold text-base text-slate-900 leading-tight">{academyData?.name || 'الأكاديمية الرياضية'}</h1>
-            <p class="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
-              <ShieldCheck class="h-3 w-3 text-emerald-600" />
-              <span>الكابتن: {userData?.fullName}</span>
-              <span class="bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded text-[10px] font-bold">
-                {userData?.role === 'owner' ? 'المالك' : 'مدرب'}
-              </span>
-            </p>
+            <h1 className="font-bold text-sm text-white leading-tight">ApexAcademy</h1>
+            <p className="text-[10px] text-emerald-400 font-medium">{academyName}</p>
           </div>
         </div>
-        
-        <button onClick={handleLogout} class="md:hidden p-2 rounded-xl bg-slate-50 text-slate-500 hover:text-red-600 transition-colors">
-          <LogOut class="h-5 w-5" />
+
+        <button
+          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          className="p-2 bg-slate-800 rounded-xl text-slate-300 hover:text-white"
+        >
+          {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
         </button>
       </header>
 
-      {/* منطقة المحتوى المتغيرة ديناميكياً بناءً على التبويب النشط */}
-      <main class="flex-1 p-4 md:p-8 max-w-5xl w-full mx-auto">
-        
-        {/* 1. عرض الصفحة الرئيسية عند اختيار "الرئيسية" */}
-        {activeTab === 'home' && (
-          <div class="space-y-6">
-            {userData?.role === 'owner' && academyData?.inviteCode && (
-              <div class="bg-gradient-to-r from-emerald-600 to-teal-700 rounded-2xl p-4 text-white shadow-sm flex items-center justify-between">
-                <div class="space-y-1">
-                  <h3 class="text-sm font-bold opacity-90">كود دعوة طاقم التدريب</h3>
-                  <p class="text-xs opacity-75">شارك هذا الكود مع مدربيك لينضموا للأكاديمية برمجياً</p>
-                </div>
-                <button 
-                  onClick={handleCopyCode}
-                  class="bg-white/10 hover:bg-white/20 active:scale-95 transition-all px-4 py-2.5 rounded-xl flex items-center space-x-2 space-x-reverse font-mono font-bold text-sm tracking-wider"
+      {/* --- القائمة المنبثقة للموبايل (Mobile Overlay Menu) --- */}
+      {mobileMenuOpen && (
+        <div className="md:hidden fixed inset-0 z-30 bg-slate-900/95 backdrop-blur-md pt-20 p-6 flex flex-col justify-between animate-fade-in">
+          <nav className="space-y-3">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    setActiveTab(item.id as any);
+                    setMobileMenuOpen(false);
+                  }}
+                  className={`w-full flex items-center space-x-4 space-x-reverse px-5 py-4 rounded-2xl font-bold text-base transition-all ${
+                    isActive 
+                      ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-900/40' 
+                      : 'text-slate-400 bg-slate-800/50 hover:bg-slate-800'
+                  }`}
                 >
-                  <span>{academyData.inviteCode}</span>
-                  {copied ? <Check class="h-4 w-4 text-emerald-300" /> : <Copy class="h-4 w-4" />}
+                  <Icon className="h-6 w-6" />
+                  <span>{item.label}</span>
                 </button>
-              </div>
-            )}
+              );
+            })}
+          </nav>
 
-            <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between space-y-3">
-                <div class="flex items-center justify-between">
-                  <span class="text-xs font-bold text-slate-500">اللاعبين</span>
-                  <div class="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center"><Users class="h-4 w-4" /></div>
-                </div>
-                <p class="text-2xl font-black text-slate-900">0</p>
-              </div>
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center justify-center space-x-2 space-x-reverse py-4 rounded-2xl font-bold text-base bg-red-500/10 text-red-400 border border-red-500/20"
+          >
+            <LogOut className="h-5 w-5" />
+            <span>تسجيل الخروج</span>
+          </button>
+        </div>
+      )}
 
-              <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between space-y-3">
-                <div class="flex items-center justify-between">
-                  <span class="text-xs font-bold text-slate-500">المدربين</span>
-                  <div class="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center"><UserSquare2 class="h-4 w-4" /></div>
-                </div>
-                <p class="text-2xl font-black text-slate-900">1</p>
-              </div>
-
-              <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between space-y-3">
-                <div class="flex items-center justify-between">
-                  <span class="text-xs font-bold text-slate-500">الحصص التدريبية</span>
-                  <div class="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center"><Calendar class="h-4 w-4" /></div>
-                </div>
-                <p class="text-2xl font-black text-slate-900">0</p>
-              </div>
-
-              <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between space-y-3">
-                <div class="flex items-center justify-between">
-                  <span class="text-xs font-bold text-slate-500">البطولات والفرق</span>
-                  <div class="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center"><Trophy class="h-4 w-4" /></div>
-                </div>
-                <p class="text-2xl font-black text-slate-900">0</p>
+      {/* --- منطقة عرض المحتوى الرئيسي (Main Content Area) --- */}
+      <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto max-w-7xl mx-auto w-full">
+        
+        {/* شاشة التبويب الأول: نظرة عامة */}
+        {activeTab === 'overview' && (
+          <div className="space-y-6 animate-fade-in">
+            <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
+              <div className="relative z-10 space-y-2">
+                <span className="inline-block px-3 py-1 bg-emerald-500/20 text-emerald-400 rounded-full text-xs font-bold border border-emerald-500/30">
+                  لوحة التحكم التكتيكية
+                </span>
+                <h2 className="text-2xl sm:text-3xl font-black">{academyName}</h2>
+                <p className="text-slate-400 text-xs sm:text-sm max-w-xl leading-relaxed">
+                  مرحباً بك في نظام إدارة الأكاديمية. يمكنك الآن متابعة تفاصيل اللاعبين، وإدارة طاقم التدريب بسهولة وبأعلى كفاءة تشغيلية.
+                </p>
               </div>
             </div>
 
-            <div class="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm space-y-4">
-              <h2 class="font-bold text-base text-slate-900">أجندة الحصص التدريبية اليوم</h2>
-              <div class="text-center py-8 space-y-2">
-                <span class="text-3xl block">📋</span>
-                <p class="text-slate-500 text-sm font-semibold">لا توجد حصص تدريبية مجدولة لليوم.</p>
-                <p class="text-xs text-slate-400">عند إضافة التمارين والحصص ستظهر تكتيكات الملاعب هنا تلقائياً.</p>
+            {/* بطاقات الإحصائيات السريعة */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div 
+                onClick={() => setActiveTab('players')}
+                className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all cursor-pointer group"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                    <Users className="h-6 w-6" />
+                  </div>
+                  <TrendingUp className="h-4 w-4 text-emerald-500" />
+                </div>
+                <div className="mt-4 space-y-1">
+                  <h3 className="font-bold text-slate-900 text-base">إدارة اللاعبين</h3>
+                  <p className="text-xs text-slate-500">عرض، إضافة، تعديل وحذف بيانات اللاعبين</p>
+                </div>
+              </div>
+
+              <div 
+                onClick={() => setActiveTab('coaches')}
+                className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all cursor-pointer group"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                    <Award className="h-6 w-6" />
+                  </div>
+                  <Activity className="h-4 w-4 text-indigo-500" />
+                </div>
+                <div className="mt-4 space-y-1">
+                  <h3 className="font-bold text-slate-900 text-base">طاقم التدريب</h3>
+                  <p className="text-xs text-slate-500">إدارة المدربين والتخصصات والرخص الفنية</p>
+                </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* 2. عرض صفحة اللاعبين عند اختيار "اللاعبين" */}
+        {/* شاشة التبويب الثاني: إدارة اللاعبين */}
         {activeTab === 'players' && <Players />}
 
-        {/* 3. عرض صفحة التدريبات (مؤقتة لحين بنائها لاحقاً) */}
-        {activeTab === 'training' && (
-          <div class="text-center py-12 text-slate-400">
-            <Calendar class="h-12 w-12 mx-auto mb-2 opacity-50" />
-            <p class="text-sm font-medium">قسم التدريبات قيد التطوير...</p>
-          </div>
-        )}
+        {/* شاشة التبويب الثالث: إدارة المدربين */}
+        {activeTab === 'coaches' && <Coaches />}
 
       </main>
 
-      {/* شريط التنقل السفلي الثابت للموبايل (Bottom Navigation) */}
-      <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 px-6 py-2 flex items-center justify-around md:hidden z-20 shadow-lg">
-        <button onClick={() => setActiveTab('home')} class={`flex flex-col items-center space-y-1 p-2 ${activeTab === 'home' ? 'text-emerald-600' : 'text-slate-400'}`}>
-          <LayoutDashboard class="h-5 w-5" />
-          <span class="text-[10px] font-bold">الرئيسية</span>
-        </button>
-        <button onClick={() => setActiveTab('players')} class={`flex flex-col items-center space-y-1 p-2 ${activeTab === 'players' ? 'text-emerald-600' : 'text-slate-400'}`}>
-          <Users class="h-5 w-5" />
-          <span class="text-[10px] font-bold">اللاعبين</span>
-        </button>
-        <button onClick={() => setActiveTab('training')} class={`flex flex-col items-center space-y-1 p-2 ${activeTab === 'training' ? 'text-emerald-600' : 'text-slate-400'}`}>
-          <Calendar class="h-5 w-5" />
-          <span class="text-[10px] font-bold">التدريبات</span>
-        </button>
-      </nav>
-
     </div>
   );
-}
+          }
+                
