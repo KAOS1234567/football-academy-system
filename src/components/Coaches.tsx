@@ -14,13 +14,11 @@ import {
 } from 'firebase/firestore';
 import { 
   Award, 
-  UserCheck, 
   UserPlus, 
   ArrowRight, 
   Save, 
   Phone, 
   Mail, 
-  Briefcase, 
   Clock, 
   Activity, 
   Loader2, 
@@ -106,10 +104,10 @@ export default function Coaches() {
 
             unsubscribeCoaches = onSnapshot(q, (snapshot) => {
               const fetchedCoaches: Coach[] = [];
-              snapshot.forEach((doc) => {
+              snapshot.forEach((docSnap) => {
                 fetchedCoaches.push({
-                  id: doc.id,
-                  ...doc.data()
+                  id: docSnap.id,
+                  ...docSnap.data()
                 } as Coach);
               });
 
@@ -224,7 +222,6 @@ export default function Coaches() {
         updatedAt: serverTimestamp()
       });
 
-      // تنظيف وإعادة ضبط الحالات بعد النجاح السحابي
       setFormData({ fullName: '', phone: '', email: '', specialization: '', license: '', experience: '', notes: '', status: 'active' });
       setSelectedCoach(null);
       setView('list');
@@ -265,13 +262,12 @@ export default function Coaches() {
     );
   }
 
-  // --- شاشة نموذج إضافة وتعديل المدرب الموحدة (DRY UI Construction) ---
+  // شاشة نموذج إضافة وتعديل المدرب الموحدة
   if (view === 'add' || view === 'edit') {
     const isEditMode = view === 'edit';
     
     return (
       <div className="space-y-6 animate-fade-in pb-12">
-        
         <div className="flex items-center space-x-3 space-x-reverse border-b border-slate-100 pb-4">
           <button 
             type="button"
@@ -296,7 +292,6 @@ export default function Coaches() {
         </div>
 
         <form onSubmit={isEditMode ? handleUpdateSubmit : handleAddSubmit} className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm space-y-4">
-          
           <div className="space-y-1">
             <label className="text-xs font-bold text-slate-700 block">الاسم الكامل للمدرب *</label>
             <input 
@@ -442,17 +437,14 @@ export default function Coaches() {
               إلغاء
             </button>
           </div>
-
         </form>
-
       </div>
     );
   }
 
-  // --- شاشة العرض الرئيسية لقائمة بطاقات المدربين (Main Dashboard List) ---
+  // شاشة العرض الرئيسية لقائمة بطاقات المدربين
   return (
     <div className="space-y-6 animate-fade-in relative">
-      
       <div className="flex items-center justify-between border-b border-slate-100 pb-4">
         <div>
           <h2 className="text-xl font-black text-slate-900">إدارة المدربين</h2>
@@ -503,4 +495,5 @@ export default function Coaches() {
                 <div className="flex items-start justify-between">
                   <div className="space-y-1">
                     <div className="flex items-center space-x-2 space-x-reverse">
-                      <h4 className="font-bold text-base text-slate-900">{coach.fullName}
+                      <h4 className="font-bold text-base text-slate-900">{coach.fullName}</h4>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${coach.status === 'inactive' ? 'bg-amber-50 text-amber-600 borde
