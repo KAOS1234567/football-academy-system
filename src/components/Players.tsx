@@ -544,6 +544,7 @@ export default function Players() {
   </button>
 </div>
 </div>
+</div>
 )}
 
 </div>
