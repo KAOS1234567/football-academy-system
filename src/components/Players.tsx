@@ -219,7 +219,11 @@ export default function Players() {
 
   // دالة الحذف النهائي القطعي من قاعدة البيانات السحابية
   const handleConfirmDelete = async () => {
-  alert("تم الضغط على نعم احذف");
+   console.log("DELETE CLICKED");
+  alert("DELETE CLICKED");
+}; 
+    
+    alert("تم الضغط على نعم احذف");
 
   if (!playerToDelete || submitting) return;
 
