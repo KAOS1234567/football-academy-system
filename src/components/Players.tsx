@@ -219,11 +219,8 @@ export default function Players() {
 
   // دالة الحذف النهائي القطعي من قاعدة البيانات السحابية
   const handleConfirmDelete = async () => {
-   console.log("DELETE CLICKED");
+  console.log("DELETE CLICKED");
   alert("DELETE CLICKED");
-}; 
-    
-    alert("تم الضغط على نعم احذف");
 
   if (!playerToDelete || submitting) return;
 
@@ -237,11 +234,9 @@ export default function Players() {
 
     setIsDeleteModalOpen(false);
     setPlayerToDelete(null);
-
   } catch (error: any) {
     console.error(error);
     alert(error.message);
-
   } finally {
     setSubmitting(false);
   }
