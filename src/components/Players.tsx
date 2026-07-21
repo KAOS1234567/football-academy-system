@@ -238,11 +238,15 @@ export default function Players() {
 
     setIsDeleteModalOpen(false);
     setPlayerToDelete(null);
-  } 
-  catch (error: any) {
-  console.error(error);
-  alert(error.message);
+
+  } catch (error: any) {
+    console.error(error);
+    alert(error.message);
+
+  } finally {
+    setSubmitting(false);
   }
+};
       
       // إغلاق النافذة وتصفير الحالة بعد النجاح
       
