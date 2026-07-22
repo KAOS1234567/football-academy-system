@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import {
   collection,
   query,
@@ -10,7 +11,8 @@ import {
   serverTimestamp,
   doc,
   orderBy,
-  Timestamp
+  Timestamp,
+  getDoc
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import {
@@ -53,10 +55,6 @@ interface CoachFormData {
   experience: number;
   certificates: string;
   notes: string;
-}
-
-interface CoachesProps {
-  academyId: string;
 }
 
 // Sub-components
@@ -531,7 +529,7 @@ const SuccessToast: React.FC<SuccessToastProps> = ({ message, isVisible }) => {
     </div>
   );
 };// Main Coaches Component
-const Coaches: React.FC<CoachesProps> = ({ academyId }) => {
+const Coaches: React.FC = () => {
   const [coaches, setCoaches] = useState<Coach[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -542,9 +540,42 @@ const Coaches: React.FC<CoachesProps> = ({ academyId }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [showSuccess, setShowSuccess] = useState(false);
+  const [academyId, setAcademyId] = useState<string | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  // Get academyId from authenticated user
+  useEffect(() => {
+    const auth = getAuth();
+    
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        try {
+          const userDocRef = doc(db, 'users', user.uid);
+          const userDocSnap = await getDoc(userDocRef);
+          
+          if (userDocSnap.exists()) {
+            const userData = userDocSnap.data();
+            setAcademyId(userData.academyId || null);
+          } else {
+            setError('لم يتم العثور على بيانات المستخدم');
+          }
+        } catch (err) {
+          console.error('Error fetching user data:', err);
+          setError('فشل في تحميل بيانات المستخدم');
+        }
+      } else {
+        setError('يجب تسجيل الدخول أولاً');
+      }
+      setAuthLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   // Load coaches from Firestore
   const loadCoaches = async () => {
+    if (!academyId) return;
+
     try {
       setLoading(true);
       setError(null);
@@ -591,6 +622,8 @@ const Coaches: React.FC<CoachesProps> = ({ academyId }) => {
 
   // Add new coach
   const handleAddCoach = async (formData: CoachFormData) => {
+    if (!academyId) return;
+
     try {
       setIsSubmitting(true);
       
@@ -720,10 +753,22 @@ const Coaches: React.FC<CoachesProps> = ({ academyId }) => {
     );
   });
 
+  // Auth loading state
+  if (authLoading) {
+    return (
+      <div className="p-4 md:p-6 lg:p-8 min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 text-emerald-600 animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">جاري التحميل...</p>
+        </div>
+      </div>
+    );
+  }
+
   // Loading state
   if (loading) {
     return (
-      <div className="p-4 md:p-6 lg:p-8">
+      <div className="p-4 md:p-6 lg:p-8 min-h-screen bg-gray-50">
         <div className="mb-6">
           <div className="h-8 bg-gray-200 rounded w-48 mb-2 animate-pulse"></div>
           <div className="h-4 bg-gray-200 rounded w-64 animate-pulse"></div>
@@ -740,7 +785,7 @@ const Coaches: React.FC<CoachesProps> = ({ academyId }) => {
   // Error state
   if (error) {
     return (
-      <div className="p-4 md:p-6 lg:p-8">
+      <div className="p-4 md:p-6 lg:p-8 min-h-screen bg-gray-50">
         <ErrorState message={error} onRetry={loadCoaches} />
       </div>
     );
