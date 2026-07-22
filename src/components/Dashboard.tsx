@@ -31,9 +31,12 @@ export default function Dashboard() {
         if (user) {
           const snap = await getDoc(doc(db, 'users', user.uid));
           if (snap.exists()) {
-            setAcademyName(snap.data()?.academyName || 'أكاديمية Apex');
+    const data = snap.data();
+
+    setAcademyName(data?.academyName || 'أكاديمية Apex');
+    setAcademyId(data?.academyId || '');
           }
-        }
+        
       } catch {
         setAcademyName('أكاديمية Apex');
       }
