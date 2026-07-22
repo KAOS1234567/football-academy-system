@@ -613,4 +613,348 @@ export default function Players({ academyId }: PlayersProps) {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="ابحث بالاسم، رقم الهاتف، أو الملاحظات..."
-                
+                className="w-full pr-10 pl-4 py-2.5 rounded-xl border border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all text-sm"
+              />
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              <div className="relative">
+                <Filter className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                <select
+                  value={positionFilter}
+                  onChange={(e) => setPositionFilter(e.target.value)}
+                  className="pr-9 pl-4 py-2.5 rounded-xl border border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none text-sm bg-white min-w-[140px]"
+                >
+                  <option value="all">كل المراكز</option>
+                  {POSITIONS.map((pos) => (
+                    <option key={pos.value} value={pos.value}>
+                      {pos.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex rounded-xl border border-slate-200 overflow-hidden">
+                <button
+                  onClick={() => toggleSort('fullName')}
+                  className={`px-3 py-2 text-xs font-medium flex items-center gap-1 transition-colors ${
+                    sortField === 'fullName'
+                      ? 'bg-indigo-50 text-indigo-700'
+                      : 'text-slate-600 hover:bg-slate-50'
+                  }`}
+                  title="ترتيب بالاسم"
+                >
+                  الاسم
+                  {sortField === 'fullName' &&
+                    (sortDirection === 'asc' ? (
+                      <SortAsc className="w-3 h-3" />
+                    ) : (
+                      <SortDesc className="w-3 h-3" />
+                    ))}
+                </button>
+                <div className="w-px bg-slate-200" />
+                <button
+                  onClick={() => toggleSort('birthDate')}
+                  className={`px-3 py-2 text-xs font-medium flex items-center gap-1 transition-colors ${
+                    sortField === 'birthDate'
+                      ? 'bg-indigo-50 text-indigo-700'
+                      : 'text-slate-600 hover:bg-slate-50'
+                  }`}
+                  title="ترتيب بالعمر"
+                >
+                  العمر
+                  {sortField === 'birthDate' &&
+                    (sortDirection === 'asc' ? (
+                      <SortAsc className="w-3 h-3" />
+                    ) : (
+                      <SortDesc className="w-3 h-3" />
+                    ))}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Players Grid */}
+        {loading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div
+                key={i}
+                className="bg-white rounded-2xl border border-slate-200 p-5 animate-pulse"
+              >
+                <div className="flex items-start gap-4">
+                  <div className="w-14 h-14 rounded-2xl bg-slate-200" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 bg-slate-200 rounded w-3/4" />
+                    <div className="h-3 bg-slate-200 rounded w-1/2" />
+                  </div>
+                </div>
+                <div className="mt-4 space-y-2">
+                  <div className="h-3 bg-slate-200 rounded w-full" />
+                  <div className="h-3 bg-slate-200 rounded w-2/3" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : filteredPlayers.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
+            <div className="w-20 h-20 mx-auto rounded-full bg-slate-100 flex items-center justify-center mb-4">
+              <Users className="w-10 h-10 text-slate-400" />
+            </div>
+            <h3 className="text-lg font-bold text-slate-900 mb-1">
+              {players.length === 0 ? 'لا يوجد لاعبون بعد' : 'لا توجد نتائج'}
+            </h3>
+            <p className="text-sm text-slate-500 mb-6">
+              {players.length === 0
+                ? 'ابدأ بإضافة أول لاعب في الأكاديمية'
+                : 'جرب تغيير معايير البحث أو الفلترة'}
+            </p>
+            {players.length === 0 && (
+              <button
+                onClick={openAddForm}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-l from-indigo-600 to-purple-600 text-white font-semibold text-sm shadow-md hover:shadow-lg transition-all"
+              >
+                <Plus className="w-5 h-5" />
+                إضافة لاعب
+              </button>
+            )}
+          </div>
+        ) : (
+          <>
+            <div className="mb-3 text-sm text-slate-500">
+              عرض {filteredPlayers.length} من {players.length} لاعب
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredPlayers.map((player) => (
+                <PlayerCard
+                  key={player.id}
+                  player={player}
+                  onEdit={openEditForm}
+                  onDelete={openDeleteConfirm}
+                />
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Add/Edit Modal */}
+      <Modal
+        isOpen={isFormOpen}
+        onClose={() => !submitting && setIsFormOpen(false)}
+        title={selectedPlayer ? 'تعديل بيانات اللاعب' : 'إضافة لاعب جديد'}
+        size="md"
+      >
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+              الاسم الكامل <span className="text-rose-500">*</span>
+            </label>
+            <div className="relative">
+              <UserIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+              <input
+                type="text"
+                value={formData.fullName}
+                onChange={(e) =>
+                  setFormData({ ...formData, fullName: e.target.value })
+                }
+                placeholder="أدخل اسم اللاعب"
+                className={`w-full pr-10 pl-4 py-2.5 rounded-xl border ${
+                  formErrors.fullName
+                    ? 'border-rose-500 focus:ring-rose-100'
+                    : 'border-slate-200 focus:ring-indigo-100'
+                } focus:border-indigo-500 focus:ring-2 outline-none transition-all text-sm`}
+              />
+            </div>
+            {formErrors.fullName && (
+              <p className="text-xs text-rose-600 mt-1">{formErrors.fullName}</p>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                تاريخ الميلاد <span className="text-rose-500">*</span>
+              </label>
+              <div className="relative">
+                <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                <input
+                  type="date"
+                  value={formData.birthDate}
+                  onChange={(e) =>
+                    setFormData({ ...formData, birthDate: e.target.value })
+                  }
+                  className={`w-full pr-10 pl-4 py-2.5 rounded-xl border ${
+                    formErrors.birthDate
+                      ? 'border-rose-500 focus:ring-rose-100'
+                      : 'border-slate-200 focus:ring-indigo-100'
+                  } focus:border-indigo-500 focus:ring-2 outline-none transition-all text-sm`}
+                />
+              </div>
+              {formErrors.birthDate && (
+                <p className="text-xs text-rose-600 mt-1">{formErrors.birthDate}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                المركز <span className="text-rose-500">*</span>
+              </label>
+              <div className="relative">
+                <Target className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                <select
+                  value={formData.position}
+                  onChange={(e) =>
+                    setFormData({ ...formData, position: e.target.value })
+                  }
+                  className={`w-full pr-10 pl-4 py-2.5 rounded-xl border ${
+                    formErrors.position
+                      ? 'border-rose-500 focus:ring-rose-100'
+                      : 'border-slate-200 focus:ring-indigo-100'
+                  } focus:border-indigo-500 focus:ring-2 outline-none transition-all text-sm bg-white`}
+                >
+                  <option value="">اختر المركز</option>
+                  {POSITIONS.map((pos) => (
+                    <option key={pos.value} value={pos.value}>
+                      {pos.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {formErrors.position && (
+                <p className="text-xs text-rose-600 mt-1">{formErrors.position}</p>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+              رقم ولي الأمر <span className="text-rose-500">*</span>
+            </label>
+            <div className="relative">
+              <Phone className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+              <input
+                type="tel"
+                dir="ltr"
+                value={formData.parentPhone}
+                onChange={(e) =>
+                  setFormData({ ...formData, parentPhone: e.target.value })
+                }
+                placeholder="+966 5X XXX XXXX"
+                className={`w-full pr-10 pl-4 py-2.5 rounded-xl border text-left ${
+                  formErrors.parentPhone
+                    ? 'border-rose-500 focus:ring-rose-100'
+                    : 'border-slate-200 focus:ring-indigo-100'
+                } focus:border-indigo-500 focus:ring-2 outline-none transition-all text-sm`}
+              />
+            </div>
+            {formErrors.parentPhone && (
+              <p className="text-xs text-rose-600 mt-1">{formErrors.parentPhone}</p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+              الملاحظات الطبية
+            </label>
+            <div className="relative">
+              <Stethoscope className="absolute right-3 top-3 w-5 h-5 text-slate-400" />
+              <textarea
+                value={formData.medicalNotes}
+                onChange={(e) =>
+                  setFormData({ ...formData, medicalNotes: e.target.value })
+                }
+                placeholder="أي حالات صحية، حساسية، أو ملاحظات طبية..."
+                rows={3}
+                className="w-full pr-10 pl-4 py-2.5 rounded-xl border border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all text-sm resize-none"
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 pt-4 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={() => setIsFormOpen(false)}
+              disabled={submitting}
+              className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 font-semibold text-sm hover:bg-slate-50 transition-colors disabled:opacity-50"
+            >
+              إلغاء
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-l from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold text-sm shadow-md hover:shadow-lg transition-all disabled:opacity-50"
+            >
+              {submitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  جاري الحفظ...
+                </>
+              ) : (
+                <>
+                  <Check className="w-4 h-4" />
+                  {selectedPlayer ? 'حفظ التعديلات' : 'إضافة اللاعب'}
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        isOpen={isDeleteOpen}
+        onClose={() => !deleting && setIsDeleteOpen(false)}
+        title="تأكيد الحذف"
+        size="sm"
+      >
+        <div className="p-6">
+          <div className="flex items-start gap-4 mb-6">
+            <div className="w-12 h-12 rounded-full bg-rose-100 flex items-center justify-center flex-shrink-0">
+              <AlertTriangle className="w-6 h-6 text-rose-600" />
+            </div>
+            <div>
+              <h3 className="font-bold text-slate-900 mb-1">
+                هل أنت متأكد من حذف اللاعب؟
+              </h3>
+              {selectedPlayer && (
+                <p className="text-sm text-slate-600">
+                  سيتم حذف اللاعب{' '}
+                  <span className="font-semibold text-slate-900">
+                    {selectedPlayer.fullName}
+                  </span>{' '}
+                  نهائياً. لا يمكن التراجع عن هذا الإجراء.
+                </p>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setIsDeleteOpen(false)}
+              disabled={deleting}
+              className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 font-semibold text-sm hover:bg-slate-50 transition-colors disabled:opacity-50"
+            >
+              إلغاء
+            </button>
+            <button
+              onClick={handleDelete}
+              disabled={deleting}
+              className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-semibold text-sm shadow-md hover:shadow-lg transition-all disabled:opacity-50"
+            >
+              {deleting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  جاري الحذف...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="w-4 h-4" />
+                  نعم، احذف
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </Modal>
+    </div>
+  );
+                }
