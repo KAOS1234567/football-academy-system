@@ -12,7 +12,7 @@ import {
   orderBy,
   Timestamp
 } from 'firebase/firestore';
-import { db } from '../firebase/config';
+import { db } from '../firebase';
 import {
   UserCircle,
   Plus,
