@@ -25,25 +25,27 @@ export default function Dashboard() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
-    async function fetchAcademy() {
-      try {
-        const user = auth.currentUser;
-        if (user) {
-          const snap = await getDoc(doc(db, 'users', user.uid));
-          if (snap.exists()) {
-    const data = snap.data();
+  async function fetchAcademy() {
+    try {
+      const user = auth.currentUser;
 
-    setAcademyName(data?.academyName || 'أكاديمية Apex');
-    setAcademyId(data?.academyId || '');
-          }
-        
-      } catch {
-        setAcademyName('أكاديمية Apex');
+      if (user) {
+        const snap = await getDoc(doc(db, "users", user.uid));
+
+        if (snap.exists()) {
+          const data = snap.data();
+
+          setAcademyName(data?.academyName || "أكاديمية Apex");
+          setAcademyId(data?.academyId || "");
+        }
       }
+    } catch {
+      setAcademyName("أكاديمية Apex");
     }
-    fetchAcademy();
-  }, []);
+  }
 
+  fetchAcademy();
+}, []);
   const handleLogout = () => signOut(auth);
 
   const navItems = [
