@@ -21,6 +21,7 @@ import Coaches from './Coaches';
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<'overview' | 'players' | 'coaches'>('overview');
   const [academyName, setAcademyName] = useState<string>('جاري التحميل...');
+  const [academyId, setAcademyId] = useState('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
