@@ -38,7 +38,7 @@ interface Coach {
   phone: string;
   specialization: string;
   experience: string;
-  certificates: string;
+  certificates: string[];
   notes: string;
   createdAt: { seconds: number } | null;
   updatedAt: { seconds: number } | null;
@@ -49,18 +49,79 @@ interface CoachFormData {
   email: string;
   phone: string;
   specialization: string;
+  customSpecialization: string;
   experience: string;
-  certificates: string;
+  certificates: string[];
+  customCertificate: string;
   notes: string;
 }
+
+const specializationOptions = [
+  "المدير الفني",
+  "مدرب أول",
+  "مدرب مساعد",
+  "مدرب حراس المرمى",
+  "مدرب لياقة بدنية",
+  "محلل أداء",
+  "مدرب ناشئين",
+  "مدرب براعم",
+  "مدرب أشبال",
+  "مدرب شباب",
+  "أخصائي تأهيل وإصابات",
+  "إداري الفريق",
+  "أخرى",
+];
+
+const experienceOptions = [
+  "0",
+  "1",
+  "2",
+  "3",
+  "4",
+  "5",
+  "6",
+  "7",
+  "8",
+  "9",
+  "10",
+  "11",
+  "12",
+  "13",
+  "14",
+  "15",
+  "16",
+  "17",
+  "18",
+  "19",
+  "20",
+  "20+",
+];
+
+const certificateOptions = [
+  "AFC C",
+  "AFC B",
+  "AFC A",
+  "AFC Pro",
+  "FIFA Coach",
+  "UEFA C",
+  "UEFA B",
+  "UEFA A",
+  "UEFA Pro",
+  "شهادة اللياقة البدنية",
+  "شهادة تحليل الأداء",
+  "شهادة الإسعافات الأولية",
+  "أخرى",
+];
 
 const initialFormData: CoachFormData = {
   fullName: "",
   email: "",
   phone: "",
   specialization: "",
+  customSpecialization: "",
   experience: "",
-  certificates: "",
+  certificates: [],
+  customCertificate: "",
   notes: "",
 };
 
@@ -97,7 +158,6 @@ export default function Coaches() {
           return;
         }
 
-        const userDocRef = doc(db, "users", currentUser.uid);
         const userSnap = await getDocs(
           query(collection(db, "users"), where("__name__", "==", currentUser.uid))
         );
@@ -170,7 +230,7 @@ export default function Coaches() {
             phone: data.phone || "",
             specialization: data.specialization || "",
             experience: data.experience || "",
-            certificates: data.certificates || "",
+            certificates: Array.isArray(data.certificates) ? data.certificates : [],
             notes: data.notes || "",
             createdAt: data.createdAt || null,
             updatedAt: data.updatedAt || null,
@@ -219,17 +279,90 @@ export default function Coaches() {
     setShowModal(false);
   };
 
+  // ==================== Handle Certificate Toggle ====================
+  const handleCertificateToggle = (cert: string): void => {
+    if (cert === "أخرى") {
+      if (formData.certificates.includes("أخرى")) {
+        setFormData({
+          ...formData,
+          certificates: formData.certificates.filter((c) => c !== "أخرى"),
+          customCertificate: "",
+        });
+      } else {
+        setFormData({
+          ...formData,
+          certificates: [...formData.certificates, "أخرى"],
+        });
+      }
+    } else {
+      if (formData.certificates.includes(cert)) {
+        setFormData({
+          ...formData,
+          certificates: formData.certificates.filter((c) => c !== cert),
+        });
+      } else {
+        setFormData({
+          ...formData,
+          certificates: [...formData.certificates, cert],
+        });
+      }
+    }
+  };
+
+  // ==================== Handle Phone Input ====================
+  const handlePhoneInput = (value: string): void => {
+    const numbersOnly = value.replace(/\D/g, "").slice(0, 10);
+    setFormData({ ...formData, phone: numbersOnly });
+  };
+
+  // ==================== Validate Form ====================
+  const validateForm = (): boolean => {
+    if (!formData.fullName.trim()) {
+      setError("الاسم الكامل مطلوب");
+      return false;
+    }
+
+    if (!formData.specialization) {
+      setError("التخصص مطلوب");
+      return false;
+    }
+
+    if (formData.specialization === "أخرى" && !formData.customSpecialization.trim()) {
+      setError("يجب كتابة التخصص المخصص");
+      return false;
+    }
+
+    if (!formData.phone.trim()) {
+      setError("رقم الهاتف مطلوب");
+      return false;
+    }
+
+    if (formData.phone.length !== 10) {
+      setError("رقم الهاتف يجب أن يكون 10 أرقام");
+      return false;
+    }
+
+    if (!formData.experience) {
+      setError("سنوات الخبرة مطلوبة");
+      return false;
+    }
+
+    if (
+      formData.certificates.includes("أخرى") &&
+      !formData.customCertificate.trim()
+    ) {
+      setError("يجب كتابة الشهادة المخصصة");
+      return false;
+    }
+
+    return true;
+  };
+
   // ==================== Handle Form Submit ====================
   const handleSubmit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
 
-    if (!formData.fullName.trim()) {
-      setError("الاسم الكامل مطلوب");
-      return;
-    }
-
-    if (!formData.email.trim()) {
-      setError("البريد الإلكتروني مطلوب");
+    if (!validateForm()) {
       return;
     }
 
@@ -237,14 +370,27 @@ export default function Coaches() {
       setSubmitting(true);
       setError("");
 
+      const finalSpecialization =
+        formData.specialization === "أخرى"
+          ? formData.customSpecialization.trim()
+          : formData.specialization;
+
+      const finalCertificates = formData.certificates
+        .filter((c) => c !== "أخرى")
+        .concat(
+          formData.certificates.includes("أخرى") && formData.customCertificate.trim()
+            ? [formData.customCertificate.trim()]
+            : []
+        );
+
       const coachData = {
         academyId,
         fullName: formData.fullName.trim(),
         email: formData.email.trim(),
-        phone: formData.phone.trim(),
-        specialization: formData.specialization.trim(),
-        experience: formData.experience.trim(),
-        certificates: formData.certificates.trim(),
+        phone: `+964${formData.phone}`,
+        specialization: finalSpecialization,
+        experience: formData.experience,
+        certificates: finalCertificates,
         notes: formData.notes.trim(),
         updatedAt: serverTimestamp(),
       };
@@ -278,7 +424,7 @@ export default function Coaches() {
           phone: data.phone || "",
           specialization: data.specialization || "",
           experience: data.experience || "",
-          certificates: data.certificates || "",
+          certificates: Array.isArray(data.certificates) ? data.certificates : [],
           notes: data.notes || "",
           createdAt: data.createdAt || null,
           updatedAt: data.updatedAt || null,
@@ -295,14 +441,25 @@ export default function Coaches() {
 
   // ==================== Handle Edit ====================
   const handleEdit = (coach: Coach): void => {
+    const isCustomSpecialization = !specializationOptions.includes(coach.specialization);
+    const isCustomCertificate = coach.certificates.some(
+      (cert) => !certificateOptions.includes(cert)
+    );
+
     setEditingCoach(coach);
     setFormData({
       fullName: coach.fullName,
       email: coach.email,
-      phone: coach.phone,
-      specialization: coach.specialization,
+      phone: coach.phone.replace("+964", ""),
+      specialization: isCustomSpecialization ? "أخرى" : coach.specialization,
+      customSpecialization: isCustomSpecialization ? coach.specialization : "",
       experience: coach.experience,
-      certificates: coach.certificates,
+      certificates: coach.certificates.filter((cert) =>
+        certificateOptions.includes(cert)
+      ),
+      customCertificate: isCustomCertificate
+        ? coach.certificates.find((cert) => !certificateOptions.includes(cert)) || ""
+        : "",
       notes: coach.notes,
     });
     setShowModal(true);
@@ -339,8 +496,7 @@ export default function Coaches() {
       coach.phone.includes(q) ||
       coach.specialization.toLowerCase().includes(q)
     );
-  });
-  // ==================== Render ====================
+  });// ==================== Render ====================
   if (academyLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -506,13 +662,15 @@ export default function Coaches() {
                 {coach.experience && (
                   <div className="flex items-center gap-2 text-sm text-gray-600">
                     <Briefcase className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                    <span>{coach.experience}</span>
+                    <span>{coach.experience} سنة خبرة</span>
                   </div>
                 )}
-                {coach.certificates && (
+                {coach.certificates && coach.certificates.length > 0 && (
                   <div className="flex items-start gap-2 text-sm text-gray-600">
                     <Award className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
-                    <span className="line-clamp-2">{coach.certificates}</span>
+                    <span className="line-clamp-2">
+                      {coach.certificates.join("، ")}
+                    </span>
                   </div>
                 )}
                 {coach.notes && (
@@ -538,6 +696,7 @@ export default function Coaches() {
           ))}
         </div>
       )}
+
       {/* Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-in fade-in">
@@ -588,7 +747,7 @@ export default function Coaches() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    البريد الإلكتروني <span className="text-red-500">*</span>
+                    البريد الإلكتروني
                   </label>
                   <div className="relative">
                     <Mail className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -600,7 +759,6 @@ export default function Coaches() {
                       }
                       placeholder="example@email.com"
                       className="w-full pr-10 pl-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                      required
                       disabled={submitting}
                     />
                   </div>
@@ -608,69 +766,98 @@ export default function Coaches() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    رقم الهاتف
+                    رقم الهاتف <span className="text-red-500">*</span>
                   </label>
-                  <div className="relative">
-                    <Phone className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <div className="flex gap-2">
+                    <div className="flex items-center gap-1 px-3 py-2.5 bg-gray-100 border border-gray-300 rounded-lg text-sm font-medium text-gray-700">
+                      <span>🇮🇶</span>
+                      <span dir="ltr">+964</span>
+                    </div>
                     <input
                       type="tel"
                       value={formData.phone}
-                      onChange={(e) =>
-                        setFormData({ ...formData, phone: e.target.value })
-                      }
-                      placeholder="+20 123 456 7890"
+                      onChange={(e) => handlePhoneInput(e.target.value)}
+                      placeholder="7712345678"
                       dir="ltr"
-                      className="w-full pr-10 pl-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-right"
+                      className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-right"
+                      required
                       disabled={submitting}
+                      maxLength={10}
                     />
                   </div>
                 </div>
               </div>
 
-              {/* Specialization & Experience */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    التخصص
-                  </label>
-                  <div className="relative">
-                    <Briefcase className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                    <input
-                      type="text"
-                      value={formData.specialization}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          specialization: e.target.value,
-                        })
-                      }
-                      placeholder="مثال: مدرب حراس، مدرب لياقة..."
-                      className="w-full pr-10 pl-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                      disabled={submitting}
-                    />
-                  </div>
+              {/* Specialization */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  التخصص <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <Briefcase className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <select
+                    value={formData.specialization}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        specialization: e.target.value,
+                        customSpecialization:
+                          e.target.value !== "أخرى" ? "" : formData.customSpecialization,
+                      })
+                    }
+                    className="w-full pr-10 pl-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    required
+                    disabled={submitting}
+                  >
+                    <option value="">اختر التخصص</option>
+                    {specializationOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
                 </div>
+                {formData.specialization === "أخرى" && (
+                  <input
+                    type="text"
+                    value={formData.customSpecialization}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        customSpecialization: e.target.value,
+                      })
+                    }
+                    placeholder="اكتب التخصص المخصص"
+                    className="w-full mt-2 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    required
+                    disabled={submitting}
+                  />
+                )}
+              </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    سنوات الخبرة
-                  </label>
-                  <div className="relative">
-                    <Award className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                    <input
-                      type="text"
-                      value={formData.experience}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          experience: e.target.value,
-                        })
-                      }
-                      placeholder="مثال: 5 سنوات"
-                      className="w-full pr-10 pl-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                      disabled={submitting}
-                    />
-                  </div>
+              {/* Experience */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  سنوات الخبرة <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <Award className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <select
+                    value={formData.experience}
+                    onChange={(e) =>
+                      setFormData({ ...formData, experience: e.target.value })
+                    }
+                    className="w-full pr-10 pl-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    required
+                    disabled={submitting}
+                  >
+                    <option value="">اختر سنوات الخبرة</option>
+                    {experienceOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
@@ -679,21 +866,38 @@ export default function Coaches() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   الشهادات والبطاقات
                 </label>
-                <div className="relative">
-                  <Award className="absolute right-3 top-3 w-5 h-5 text-gray-400" />
-                  <textarea
-                    value={formData.certificates}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        certificates: e.target.value,
-                      })
-                    }
-                    placeholder="اذكر الشهادات والبطاقات المهنية..."
-                    rows={3}
-                    className="w-full pr-10 pl-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none"
-                    disabled={submitting}
-                  />
+                <div className="space-y-2 border border-gray-300 rounded-lg p-4">
+                  {certificateOptions.map((cert) => (
+                    <label
+                      key={cert}
+                      className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={formData.certificates.includes(cert)}
+                        onChange={() => handleCertificateToggle(cert)}
+                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        disabled={submitting}
+                      />
+                      <span className="text-sm text-gray-700">{cert}</span>
+                    </label>
+                  ))}
+                  {formData.certificates.includes("أخرى") && (
+                    <input
+                      type="text"
+                      value={formData.customCertificate}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          customCertificate: e.target.value,
+                        })
+                      }
+                      placeholder="اكتب الشهادة المخصصة"
+                      className="w-full mt-2 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      required
+                      disabled={submitting}
+                    />
+                  )}
                 </div>
               </div>
 
@@ -751,4 +955,4 @@ export default function Coaches() {
       )}
     </div>
   );
-              }
+      }
