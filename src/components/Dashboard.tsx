@@ -154,7 +154,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        {activeTab === 'players' && <Players />}
+        {activeTab === 'players' && <Players academyId={academyId} />}
         {activeTab === 'coaches' && <Coaches />}
       </main>
     </div>
