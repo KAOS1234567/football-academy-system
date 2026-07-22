@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from 'react';
-import { getAuth, onAuthStateChanged } from 'firebase/auth';
+import { useState, useEffect, FormEvent } from "react";
 import {
   collection,
   query,
@@ -8,31 +7,29 @@ import {
   addDoc,
   updateDoc,
   deleteDoc,
-  serverTimestamp,
   doc,
-  orderBy,
-  Timestamp,
-  getDoc
-} from 'firebase/firestore';
-import { db } from '../firebase';
+  serverTimestamp,
+} from "firebase/firestore";
+import { db, auth } from "../firebase";
 import {
-  UserCircle,
+  Users,
   Plus,
-  Search,
   Edit2,
   Trash2,
+  Search,
   X,
+  Save,
   Award,
-  Briefcase,
-  Mail,
   Phone,
+  Mail,
+  Briefcase,
   FileText,
   Loader2,
   AlertCircle,
-  CheckCircle2
-} from 'lucide-react';
+  CheckCircle2,
+} from "lucide-react";
 
-// TypeScript Interfaces
+// ==================== Types ====================
 interface Coach {
   id: string;
   academyId: string;
@@ -40,11 +37,11 @@ interface Coach {
   email: string;
   phone: string;
   specialization: string;
-  experience: number;
-  certificates: string[];
+  experience: string;
+  certificates: string;
   notes: string;
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
+  createdAt: { seconds: number } | null;
+  updatedAt: { seconds: number } | null;
 }
 
 interface CoachFormData {
@@ -52,825 +49,706 @@ interface CoachFormData {
   email: string;
   phone: string;
   specialization: string;
-  experience: number;
+  experience: string;
   certificates: string;
   notes: string;
 }
 
-// Sub-components
+const initialFormData: CoachFormData = {
+  fullName: "",
+  email: "",
+  phone: "",
+  specialization: "",
+  experience: "",
+  certificates: "",
+  notes: "",
+};
 
-// Loading Skeleton
-const CoachCardSkeleton: React.FC = () => (
-  <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 animate-pulse">
-    <div className="flex items-start gap-4">
-      <div className="w-16 h-16 bg-gray-200 rounded-full"></div>
-      <div className="flex-1 space-y-3">
-        <div className="h-5 bg-gray-200 rounded w-3/4"></div>
-        <div className="h-4 bg-gray-200 rounded w-1/2"></div>
-        <div className="h-4 bg-gray-200 rounded w-2/3"></div>
-      </div>
-    </div>
-    <div className="mt-4 space-y-2">
-      <div className="h-4 bg-gray-200 rounded"></div>
-      <div className="h-4 bg-gray-200 rounded w-5/6"></div>
-    </div>
-  </div>
-);
+// ==================== Component ====================
+export default function Coaches() {
+  // ==================== States ====================
+  const [coaches, setCoaches] = useState<Coach[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string>("");
+  const [success, setSuccess] = useState<string>("");
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [showModal, setShowModal] = useState<boolean>(false);
+  const [editingCoach, setEditingCoach] = useState<Coach | null>(null);
+  const [formData, setFormData] = useState<CoachFormData>(initialFormData);
+  const [submitting, setSubmitting] = useState<boolean>(false);
+  const [academyId, setAcademyId] = useState<string>("");
+  const [academyLoading, setAcademyLoading] = useState<boolean>(true);
 
-// Empty State
-const EmptyState: React.FC = () => (
-  <div className="text-center py-16 px-4">
-    <div className="w-24 h-24 mx-auto mb-6 bg-emerald-50 rounded-full flex items-center justify-center">
-      <UserCircle className="w-12 h-12 text-emerald-600" />
-    </div>
-    <h3 className="text-2xl font-bold text-gray-900 mb-2">لا يوجد مدربين بعد</h3>
-    <p className="text-gray-600 mb-8">ابدأ بإضافة أول مدرب لأكاديميتك</p>
-  </div>
-);
+  // ==================== Get Academy ID ====================
+  useEffect(() => {
+    let isMounted = true;
 
-// Error State
-interface ErrorStateProps {
-  message: string;
-  onRetry: () => void;
-}
+    const fetchAcademyId = async (): Promise<void> => {
+      try {
+        setAcademyLoading(true);
+        const currentUser = auth.currentUser;
 
-const ErrorState: React.FC<ErrorStateProps> = ({ message, onRetry }) => (
-  <div className="text-center py-16 px-4">
-    <div className="w-24 h-24 mx-auto mb-6 bg-red-50 rounded-full flex items-center justify-center">
-      <AlertCircle className="w-12 h-12 text-red-600" />
-    </div>
-    <h3 className="text-2xl font-bold text-gray-900 mb-2">حدث خطأ</h3>
-    <p className="text-gray-600 mb-6">{message}</p>
-    <button
-      onClick={onRetry}
-      className="px-6 py-3 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-colors"
-    >
-      إعادة المحاولة
-    </button>
-  </div>
-);
+        if (!currentUser) {
+          if (isMounted) {
+            setError("يجب تسجيل الدخول أولاً");
+            setAcademyLoading(false);
+            setLoading(false);
+          }
+          return;
+        }
 
-// Coach Card Component
-interface CoachCardProps {
-  coach: Coach;
-  onEdit: (coach: Coach) => void;
-  onDelete: (coach: Coach) => void;
-}
+        const userDocRef = doc(db, "users", currentUser.uid);
+        const userSnap = await getDocs(
+          query(collection(db, "users"), where("__name__", "==", currentUser.uid))
+        );
 
-const CoachCard: React.FC<CoachCardProps> = ({ coach, onEdit, onDelete }) => (
-  <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
-    <div className="flex items-start justify-between mb-4">
-      <div className="flex items-start gap-4">
-        <div className="w-16 h-16 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-full flex items-center justify-center text-white font-bold text-xl">
-          {coach.fullName.charAt(0)}
-        </div>
-        <div>
-          <h3 className="text-lg font-bold text-gray-900 mb-1">{coach.fullName}</h3>
-          <p className="text-sm text-emerald-600 font-medium">{coach.specialization}</p>
-        </div>
-      </div>
-      <div className="flex gap-2">
-        <button
-          onClick={() => onEdit(coach)}
-          className="p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
-          aria-label="تعديل"
-        >
-          <Edit2 className="w-5 h-5" />
-        </button>
-        <button
-          onClick={() => onDelete(coach)}
-          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-          aria-label="حذف"
-        >
-          <Trash2 className="w-5 h-5" />
-        </button>
-      </div>
-    </div>
+        if (userSnap.empty) {
+          if (isMounted) {
+            setError("لم يتم العثور على بيانات المستخدم");
+            setAcademyLoading(false);
+            setLoading(false);
+          }
+          return;
+        }
 
-    <div className="space-y-3 text-sm">
-      <div className="flex items-center gap-2 text-gray-600">
-        <Mail className="w-4 h-4" />
-        <span dir="ltr">{coach.email}</span>
-      </div>
-      <div className="flex items-center gap-2 text-gray-600">
-        <Phone className="w-4 h-4" />
-        <span dir="ltr">{coach.phone}</span>
-      </div>
-      <div className="flex items-center gap-2 text-gray-600">
-        <Briefcase className="w-4 h-4" />
-        <span>{coach.experience} سنوات خبرة</span>
-      </div>
-      {coach.certificates.length > 0 && (
-        <div className="flex items-start gap-2 text-gray-600">
-          <Award className="w-4 h-4 mt-0.5" />
-          <div className="flex flex-wrap gap-1">
-            {coach.certificates.slice(0, 2).map((cert, index) => (
-              <span
-                key={index}
-                className="px-2 py-1 bg-emerald-50 text-emerald-700 rounded-md text-xs font-medium"
-              >
-                {cert}
-              </span>
-            ))}
-            {coach.certificates.length > 2 && (
-              <span className="px-2 py-1 bg-gray-50 text-gray-600 rounded-md text-xs">
-                +{coach.certificates.length - 2}
-              </span>
-            )}
-          </div>
-        </div>
-      )}
-      {coach.notes && (
-        <div className="flex items-start gap-2 text-gray-600 pt-2 border-t border-gray-100">
-          <FileText className="w-4 h-4 mt-0.5" />
-          <p className="text-xs leading-relaxed">{coach.notes}</p>
-        </div>
-      )}
-    </div>
-  </div>
-);
+        const userData = userSnap.docs[0].data();
+        const academy = userData?.academyId as string | undefined;
 
-// Coach Form Modal
-interface CoachFormModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSubmit: (data: CoachFormData) => Promise<void>;
-  initialData?: Coach;
-  isLoading: boolean;
-}
+        if (!academy) {
+          if (isMounted) {
+            setError("لم يتم العثور على academyId للمستخدم");
+            setAcademyLoading(false);
+            setLoading(false);
+          }
+          return;
+        }
 
-const CoachFormModal: React.FC<CoachFormModalProps> = ({
-  isOpen,
-  onClose,
-  onSubmit,
-  initialData,
-  isLoading
-}) => {
-  const [formData, setFormData] = useState<CoachFormData>({
-    fullName: '',
-    email: '',
-    phone: '',
-    specialization: '',
-    experience: 0,
-    certificates: '',
-    notes: ''
-  });
+        if (isMounted) {
+          setAcademyId(academy);
+          setAcademyLoading(false);
+        }
+      } catch (err) {
+        console.error("Error fetching academyId:", err);
+        if (isMounted) {
+          setError("حدث خطأ أثناء جلب بيانات الأكاديمية");
+          setAcademyLoading(false);
+          setLoading(false);
+        }
+      }
+    };
 
-  const [errors, setErrors] = useState<Partial<CoachFormData>>({});
+    void fetchAcademyId();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // ==================== Load Coaches ====================
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadCoaches = async (): Promise<void> => {
+      if (!academyId) return;
+
+      try {
+        setLoading(true);
+        setError("");
+
+        const coachesRef = collection(db, "coaches");
+        const q = query(coachesRef, where("academyId", "==", academyId));
+        const querySnapshot = await getDocs(q);
+
+        const coachesList: Coach[] = [];
+        querySnapshot.forEach((docSnap) => {
+          const data = docSnap.data();
+          coachesList.push({
+            id: docSnap.id,
+            academyId: data.academyId || "",
+            fullName: data.fullName || "",
+            email: data.email || "",
+            phone: data.phone || "",
+            specialization: data.specialization || "",
+            experience: data.experience || "",
+            certificates: data.certificates || "",
+            notes: data.notes || "",
+            createdAt: data.createdAt || null,
+            updatedAt: data.updatedAt || null,
+          });
+        });
+
+        if (isMounted) {
+          setCoaches(coachesList);
+          setLoading(false);
+        }
+      } catch (err) {
+        console.error("Error loading coaches:", err);
+        if (isMounted) {
+          setError("حدث خطأ أثناء تحميل المدربين");
+          setLoading(false);
+        }
+      }
+    };
+
+    void loadCoaches();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [academyId]);
+
+  // ==================== Auto Clear Messages ====================
+  useEffect(() => {
+    if (success) {
+      const timer = setTimeout(() => setSuccess(""), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [success]);
 
   useEffect(() => {
-    if (initialData) {
-      setFormData({
-        fullName: initialData.fullName,
-        email: initialData.email,
-        phone: initialData.phone,
-        specialization: initialData.specialization,
-        experience: initialData.experience,
-        certificates: initialData.certificates.join(', '),
-        notes: initialData.notes
-      });
-    } else {
-      setFormData({
-        fullName: '',
-        email: '',
-        phone: '',
-        specialization: '',
-        experience: 0,
-        certificates: '',
-        notes: ''
-      });
+    if (error && error !== "يجب تسجيل الدخول أولاً") {
+      const timer = setTimeout(() => setError(""), 5000);
+      return () => clearTimeout(timer);
     }
-    setErrors({});
-  }, [initialData, isOpen]);
+  }, [error]);
 
-  const validateForm = (): boolean => {
-    const newErrors: Partial<CoachFormData> = {};
+  // ==================== Reset Form ====================
+  const resetForm = (): void => {
+    setFormData(initialFormData);
+    setEditingCoach(null);
+    setShowModal(false);
+  };
+
+  // ==================== Handle Form Submit ====================
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
+    e.preventDefault();
 
     if (!formData.fullName.trim()) {
-      newErrors.fullName = 'الاسم مطلوب';
+      setError("الاسم الكامل مطلوب");
+      return;
     }
 
     if (!formData.email.trim()) {
-      newErrors.email = 'البريد الإلكتروني مطلوب';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = 'بريد إلكتروني غير صحيح';
+      setError("البريد الإلكتروني مطلوب");
+      return;
     }
-
-    if (!formData.phone.trim()) {
-      newErrors.phone = 'رقم الهاتف مطلوب';
-    } else if (!/^[\d\s+-]+$/.test(formData.phone)) {
-      newErrors.phone = 'رقم هاتف غير صحيح';
-    }
-
-    if (!formData.specialization.trim()) {
-      newErrors.specialization = 'التخصص مطلوب';
-    }
-
-    if (formData.experience < 0) {
-      newErrors.experience = 'سنوات الخبرة يجب أن تكون رقم موجب';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (validateForm()) {
-      await onSubmit(formData);
-    }
-  };
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden shadow-2xl">
-        <div className="flex items-center justify-between p-6 border-b border-gray-100">
-          <h2 className="text-2xl font-bold text-gray-900">
-            {initialData ? 'تعديل المدرب' : 'إضافة مدرب جديد'}
-          </h2>
-          <button
-            onClick={onClose}
-            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-          >
-            <X className="w-6 h-6" />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
-          <div className="space-y-5">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                الاسم الكامل *
-              </label>
-              <input
-                type="text"
-                value={formData.fullName}
-                onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all ${
-                  errors.fullName ? 'border-red-500' : 'border-gray-200'
-                }`}
-                placeholder="أدخل اسم المدرب"
-              />
-              {errors.fullName && (
-                <p className="mt-1 text-sm text-red-600">{errors.fullName}</p>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  البريد الإلكتروني *
-                </label>
-                <input
-                  type="email"
-                  dir="ltr"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all ${
-                    errors.email ? 'border-red-500' : 'border-gray-200'
-                  }`}
-                  placeholder="coach@example.com"
-                />
-                {errors.email && (
-                  <p className="mt-1 text-sm text-red-600">{errors.email}</p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  رقم الهاتف *
-                </label>
-                <input
-                  type="tel"
-                  dir="ltr"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all ${
-                    errors.phone ? 'border-red-500' : 'border-gray-200'
-                  }`}
-                  placeholder="+966 50 123 4567"
-                />
-                {errors.phone && (
-                  <p className="mt-1 text-sm text-red-600">{errors.phone}</p>
-                )}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  التخصص *
-                </label>
-                <input
-                  type="text"
-                  value={formData.specialization}
-                  onChange={(e) => setFormData({ ...formData, specialization: e.target.value })}
-                  className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all ${
-                    errors.specialization ? 'border-red-500' : 'border-gray-200'
-                  }`}
-                  placeholder="مدرب حراس، مدرب لياقة، إلخ"
-                />
-                {errors.specialization && (
-                  <p className="mt-1 text-sm text-red-600">{errors.specialization}</p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  سنوات الخبرة
-                </label>
-                <input
-                  type="number"
-                  value={formData.experience}
-                  onChange={(e) =>
-                    setFormData({ ...formData, experience: parseInt(e.target.value) || 0 })
-                  }
-                  min="0"
-                  className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all ${
-                    errors.experience ? 'border-red-500' : 'border-gray-200'
-                  }`}
-                />
-                {errors.experience && (
-                  <p className="mt-1 text-sm text-red-600">{errors.experience}</p>
-                )}
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                الشهادات (مفصولة بفاصلة)
-              </label>
-              <input
-                type="text"
-                value={formData.certificates}
-                onChange={(e) => setFormData({ ...formData, certificates: e.target.value })}
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
-                placeholder="UEFA Pro License, AFC A License"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">ملاحظات</label>
-              <textarea
-                value={formData.notes}
-                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                rows={4}
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all resize-none"
-                placeholder="أي ملاحظات إضافية عن المدرب..."
-              />
-            </div>
-          </div>
-
-          <div className="flex gap-3 mt-8">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 px-6 py-3 border border-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition-colors"
-              disabled={isLoading}
-            >
-              إلغاء
-            </button>
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="flex-1 px-6 py-3 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  <span>جاري الحفظ...</span>
-                </>
-              ) : (
-                <span>{initialData ? 'تحديث' : 'إضافة'}</span>
-              )}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-};
-
-// Delete Confirmation Modal
-interface DeleteModalProps {
-  isOpen: boolean;
-  coach: Coach | null;
-  onConfirm: () => void;
-  onCancel: () => void;
-  isLoading: boolean;
-}
-
-const DeleteConfirmationModal: React.FC<DeleteModalProps> = ({
-  isOpen,
-  coach,
-  onConfirm,
-  onCancel,
-  isLoading
-}) => {
-  if (!isOpen || !coach) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl">
-        <div className="w-16 h-16 mx-auto mb-4 bg-red-50 rounded-full flex items-center justify-center">
-          <Trash2 className="w-8 h-8 text-red-600" />
-        </div>
-        <h3 className="text-xl font-bold text-gray-900 text-center mb-2">حذف المدرب</h3>
-        <p className="text-gray-600 text-center mb-6">
-          هل أنت متأكد من حذف المدرب <span className="font-semibold">{coach.fullName}</span>؟
-          <br />
-          لا يمكن التراجع عن هذا الإجراء.
-        </p>
-        <div className="flex gap-3">
-          <button
-            onClick={onCancel}
-            className="flex-1 px-6 py-3 border border-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition-colors"
-            disabled={isLoading}
-          >
-            إلغاء
-          </button>
-          <button
-            onClick={onConfirm}
-            disabled={isLoading}
-            className="flex-1 px-6 py-3 bg-red-600 text-white rounded-xl font-semibold hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="w-5 h-5 animate-spin" />
-                <span>جاري الحذف...</span>
-              </>
-            ) : (
-              <span>حذف</span>
-            )}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// Success Toast
-interface SuccessToastProps {
-  message: string;
-  isVisible: boolean;
-}
-
-const SuccessToast: React.FC<SuccessToastProps> = ({ message, isVisible }) => {
-  if (!isVisible) return null;
-
-  return (
-    <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 animate-slide-down">
-      <div className="bg-emerald-600 text-white px-6 py-3 rounded-xl shadow-lg flex items-center gap-3">
-        <CheckCircle2 className="w-5 h-5" />
-        <span className="font-semibold">{message}</span>
-      </div>
-    </div>
-  );
-};// Main Coaches Component
-const Coaches: React.FC = () => {
-  const [coaches, setCoaches] = useState<Coach[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isFormModalOpen, setIsFormModalOpen] = useState(false);
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [selectedCoach, setSelectedCoach] = useState<Coach | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [successMessage, setSuccessMessage] = useState('');
-  const [showSuccess, setShowSuccess] = useState(false);
-  const [academyId, setAcademyId] = useState<string | null>(null);
-  const [authLoading, setAuthLoading] = useState(true);
-
-  // Get academyId from authenticated user
-  useEffect(() => {
-    const auth = getAuth();
-    
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        try {
-          const userDocRef = doc(db, 'users', user.uid);
-          const userDocSnap = await getDoc(userDocRef);
-          
-          if (userDocSnap.exists()) {
-            const userData = userDocSnap.data();
-            setAcademyId(userData.academyId || null);
-          } else {
-            setError('لم يتم العثور على بيانات المستخدم');
-          }
-        } catch (err) {
-          console.error('Error fetching user data:', err);
-          setError('فشل في تحميل بيانات المستخدم');
-        }
-      } else {
-        setError('يجب تسجيل الدخول أولاً');
-      }
-      setAuthLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, []);
-
-  // Load coaches from Firestore
-  const loadCoaches = async () => {
-    if (!academyId) return;
 
     try {
-      setLoading(true);
-      setError(null);
-      
-      const coachesQuery = query(
-        collection(db, 'coaches'),
-        where('academyId', '==', academyId),
-        orderBy('createdAt', 'desc')
-      );
-      
-      const querySnapshot = await getDocs(coachesQuery);
-      const coachesData: Coach[] = [];
-      
-      querySnapshot.forEach((doc) => {
-        coachesData.push({
-          id: doc.id,
-          ...doc.data()
-        } as Coach);
-      });
-      
-      setCoaches(coachesData);
-    } catch (err) {
-      console.error('Error loading coaches:', err);
-      setError('فشل في تحميل المدربين. يرجى المحاولة مرة أخرى.');
-    } finally {
-      setLoading(false);
-    }
-  };
+      setSubmitting(true);
+      setError("");
 
-  useEffect(() => {
-    if (academyId) {
-      loadCoaches();
-    }
-  }, [academyId]);
-
-  // Show success message
-  const showSuccessMessage = (message: string) => {
-    setSuccessMessage(message);
-    setShowSuccess(true);
-    setTimeout(() => {
-      setShowSuccess(false);
-    }, 3000);
-  };
-
-  // Add new coach
-  const handleAddCoach = async (formData: CoachFormData) => {
-    if (!academyId) return;
-
-    try {
-      setIsSubmitting(true);
-      
-      const certificatesArray = formData.certificates
-        .split(',')
-        .map(cert => cert.trim())
-        .filter(cert => cert.length > 0);
-      
       const coachData = {
         academyId,
         fullName: formData.fullName.trim(),
         email: formData.email.trim(),
         phone: formData.phone.trim(),
         specialization: formData.specialization.trim(),
-        experience: formData.experience,
-        certificates: certificatesArray,
+        experience: formData.experience.trim(),
+        certificates: formData.certificates.trim(),
         notes: formData.notes.trim(),
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
+        updatedAt: serverTimestamp(),
       };
-      
-      await addDoc(collection(db, 'coaches'), coachData);
-      
-      setIsFormModalOpen(false);
-      await loadCoaches();
-      showSuccessMessage('تم إضافة المدرب بنجاح');
+
+      if (editingCoach) {
+        const coachDocRef = doc(db, "coaches", editingCoach.id);
+        await updateDoc(coachDocRef, coachData);
+        setSuccess("تم تحديث بيانات المدرب بنجاح");
+      } else {
+        const coachesRef = collection(db, "coaches");
+        await addDoc(coachesRef, {
+          ...coachData,
+          createdAt: serverTimestamp(),
+        });
+        setSuccess("تم إضافة المدرب بنجاح");
+      }
+
+      resetForm();
+
+      // Reload coaches
+      const q = query(collection(db, "coaches"), where("academyId", "==", academyId));
+      const querySnapshot = await getDocs(q);
+      const coachesList: Coach[] = [];
+      querySnapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        coachesList.push({
+          id: docSnap.id,
+          academyId: data.academyId || "",
+          fullName: data.fullName || "",
+          email: data.email || "",
+          phone: data.phone || "",
+          specialization: data.specialization || "",
+          experience: data.experience || "",
+          certificates: data.certificates || "",
+          notes: data.notes || "",
+          createdAt: data.createdAt || null,
+          updatedAt: data.updatedAt || null,
+        });
+      });
+      setCoaches(coachesList);
     } catch (err) {
-      console.error('Error adding coach:', err);
-      throw new Error('فشل في إضافة المدرب');
+      console.error("Error saving coach:", err);
+      setError("حدث خطأ أثناء حفظ بيانات المدرب");
     } finally {
-      setIsSubmitting(false);
+      setSubmitting(false);
     }
   };
 
-  // Update coach
-  const handleUpdateCoach = async (formData: CoachFormData) => {
-    if (!selectedCoach) return;
-    
-    try {
-      setIsSubmitting(true);
-      
-      const certificatesArray = formData.certificates
-        .split(',')
-        .map(cert => cert.trim())
-        .filter(cert => cert.length > 0);
-      
-      const coachData = {
-        fullName: formData.fullName.trim(),
-        email: formData.email.trim(),
-        phone: formData.phone.trim(),
-        specialization: formData.specialization.trim(),
-        experience: formData.experience,
-        certificates: certificatesArray,
-        notes: formData.notes.trim(),
-        updatedAt: serverTimestamp()
-      };
-      
-      const coachDocRef = doc(db, 'coaches', selectedCoach.id);
-      await updateDoc(coachDocRef, coachData);
-      
-      setIsFormModalOpen(false);
-      setSelectedCoach(null);
-      await loadCoaches();
-      showSuccessMessage('تم تحديث بيانات المدرب بنجاح');
-    } catch (err) {
-      console.error('Error updating coach:', err);
-      throw new Error('فشل في تحديث بيانات المدرب');
-    } finally {
-      setIsSubmitting(false);
-    }
+  // ==================== Handle Edit ====================
+  const handleEdit = (coach: Coach): void => {
+    setEditingCoach(coach);
+    setFormData({
+      fullName: coach.fullName,
+      email: coach.email,
+      phone: coach.phone,
+      specialization: coach.specialization,
+      experience: coach.experience,
+      certificates: coach.certificates,
+      notes: coach.notes,
+    });
+    setShowModal(true);
   };
 
-  // Delete coach
-  const handleDeleteCoach = async () => {
-    if (!selectedCoach) return;
-    
+  // ==================== Handle Delete ====================
+  const handleDelete = async (coachId: string, coachName: string): Promise<void> => {
+    const confirmed = window.confirm(
+      `هل أنت متأكد من حذف المدرب "${coachName}"؟\nلا يمكن التراجع عن هذا الإجراء.`
+    );
+
+    if (!confirmed) return;
+
     try {
-      setIsSubmitting(true);
-      
-      const coachDocRef = doc(db, 'coaches', selectedCoach.id);
+      setError("");
+      const coachDocRef = doc(db, "coaches", coachId);
       await deleteDoc(coachDocRef);
-      
-      setIsDeleteModalOpen(false);
-      setSelectedCoach(null);
-      await loadCoaches();
-      showSuccessMessage('تم حذف المدرب بنجاح');
+
+      setCoaches((prev) => prev.filter((c) => c.id !== coachId));
+      setSuccess("تم حذف المدرب بنجاح");
     } catch (err) {
-      console.error('Error deleting coach:', err);
-      throw new Error('فشل في حذف المدرب');
-    } finally {
-      setIsSubmitting(false);
+      console.error("Error deleting coach:", err);
+      setError("حدث خطأ أثناء حذف المدرب");
     }
   };
 
-  // Open edit modal
-  const handleEditClick = (coach: Coach) => {
-    setSelectedCoach(coach);
-    setIsFormModalOpen(true);
-  };
-
-  // Open delete modal
-  const handleDeleteClick = (coach: Coach) => {
-    setSelectedCoach(coach);
-    setIsDeleteModalOpen(true);
-  };
-
-  // Close form modal
-  const handleCloseFormModal = () => {
-    setIsFormModalOpen(false);
-    setSelectedCoach(null);
-  };
-
-  // Close delete modal
-  const handleCloseDeleteModal = () => {
-    setIsDeleteModalOpen(false);
-    setSelectedCoach(null);
-  };
-
-  // Filter coaches by search query
+  // ==================== Filtered Coaches ====================
   const filteredCoaches = coaches.filter((coach) => {
-    const query = searchQuery.toLowerCase();
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return true;
     return (
-      coach.fullName.toLowerCase().includes(query) ||
-      coach.email.toLowerCase().includes(query) ||
-      coach.phone.includes(query) ||
-      coach.specialization.toLowerCase().includes(query)
+      coach.fullName.toLowerCase().includes(q) ||
+      coach.email.toLowerCase().includes(q) ||
+      coach.phone.includes(q) ||
+      coach.specialization.toLowerCase().includes(q)
     );
   });
-
-  // Auth loading state
-  if (authLoading) {
+  // ==================== Render ====================
+  if (academyLoading) {
     return (
-      <div className="p-4 md:p-6 lg:p-8 min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
-          <Loader2 className="w-12 h-12 text-emerald-600 animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">جاري التحميل...</p>
+          <Loader2 className="w-12 h-12 animate-spin text-blue-600 mx-auto mb-4" />
+          <p className="text-gray-600 text-lg">جاري تحميل البيانات...</p>
         </div>
-      </div>
-    );
-  }
-
-  // Loading state
-  if (loading) {
-    return (
-      <div className="p-4 md:p-6 lg:p-8 min-h-screen bg-gray-50">
-        <div className="mb-6">
-          <div className="h-8 bg-gray-200 rounded w-48 mb-2 animate-pulse"></div>
-          <div className="h-4 bg-gray-200 rounded w-64 animate-pulse"></div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[...Array(6)].map((_, index) => (
-            <CoachCardSkeleton key={index} />
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  // Error state
-  if (error) {
-    return (
-      <div className="p-4 md:p-6 lg:p-8 min-h-screen bg-gray-50">
-        <ErrorState message={error} onRetry={loadCoaches} />
       </div>
     );
   }
 
   return (
-    <div className="p-4 md:p-6 lg:p-8 min-h-screen bg-gray-50">
-      {/* Success Toast */}
-      <SuccessToast message={successMessage} isVisible={showSuccess} />
-
+    <div className="container mx-auto px-4 py-8 max-w-7xl">
       {/* Header */}
       <div className="mb-8">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">المدربين</h1>
-            <p className="text-gray-600">إدارة مدربي الأكاديمية</p>
-          </div>
-          <button
-            onClick={() => setIsFormModalOpen(true)}
-            className="flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-colors shadow-sm hover:shadow-md"
-          >
-            <Plus className="w-5 h-5" />
-            <span>إضافة مدرب</span>
-          </button>
+        <div className="flex items-center gap-3 mb-2">
+          <Users className="w-8 h-8 text-blue-600" />
+          <h1 className="text-3xl font-bold text-gray-900">إدارة المدربين</h1>
         </div>
-
-        {/* Search Bar */}
-        {coaches.length > 0 && (
-          <div className="relative">
-            <Search className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="ابحث عن مدرب بالاسم، البريد، الهاتف، أو التخصص..."
-              className="w-full pr-12 pl-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
-            />
-          </div>
-        )}
+        <p className="text-gray-600">إدارة مدربي الأكاديمية ومتابعة بياناتهم</p>
       </div>
 
-      {/* Empty State */}
-      {coaches.length === 0 && <EmptyState />}
-
-      {/* Coaches Grid */}
-      {coaches.length > 0 && (
-        <>
-          {filteredCoaches.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-gray-600 text-lg">لا توجد نتائج مطابقة للبحث</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredCoaches.map((coach) => (
-                <CoachCard
-                  key={coach.id}
-                  coach={coach}
-                  onEdit={handleEditClick}
-                  onDelete={handleDeleteClick}
-                />
-              ))}
-            </div>
-          )}
-        </>
+      {/* Success Message */}
+      {success && (
+        <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4 flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
+          <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0" />
+          <p className="text-green-800 font-medium">{success}</p>
+          <button
+            onClick={() => setSuccess("")}
+            className="ml-auto text-green-600 hover:text-green-800"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
       )}
 
-      {/* Form Modal */}
-      <CoachFormModal
-        isOpen={isFormModalOpen}
-        onClose={handleCloseFormModal}
-        onSubmit={selectedCoach ? handleUpdateCoach : handleAddCoach}
-        initialData={selectedCoach || undefined}
-        isLoading={isSubmitting}
-      />
+      {/* Error Message */}
+      {error && (
+        <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4 flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
+          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
+          <p className="text-red-800 font-medium">{error}</p>
+          <button
+            onClick={() => setError("")}
+            className="ml-auto text-red-600 hover:text-red-800"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
-      {/* Delete Confirmation Modal */}
-      <DeleteConfirmationModal
-        isOpen={isDeleteModalOpen}
-        coach={selectedCoach}
-        onConfirm={handleDeleteCoach}
-        onCancel={handleCloseDeleteModal}
-        isLoading={isSubmitting}
-      />
+      {/* Actions Bar */}
+      <div className="mb-6 flex flex-col sm:flex-row gap-4">
+        {/* Search */}
+        <div className="flex-1 relative">
+          <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <input
+            type="text"
+            placeholder="ابحث بالاسم، البريد، الهاتف، أو التخصص..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pr-10 pl-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+          />
+        </div>
+
+        {/* Add Button */}
+        <button
+          onClick={() => {
+            resetForm();
+            setShowModal(true);
+          }}
+          className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 font-medium shadow-sm hover:shadow-md"
+        >
+          <Plus className="w-5 h-5" />
+          إضافة مدرب جديد
+        </button>
+      </div>
+
+      {/* Loading State */}
+      {loading ? (
+        <div className="flex items-center justify-center min-h-[300px]">
+          <div className="text-center">
+            <Loader2 className="w-12 h-12 animate-spin text-blue-600 mx-auto mb-4" />
+            <p className="text-gray-600 text-lg">جاري تحميل المدربين...</p>
+          </div>
+        </div>
+      ) : filteredCoaches.length === 0 ? (
+        /* Empty State */
+        <div className="text-center py-16 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+          <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-xl font-semibold text-gray-700 mb-2">
+            {searchQuery ? "لا توجد نتائج للبحث" : "لا يوجد مدربين حالياً"}
+          </h3>
+          <p className="text-gray-500 mb-6">
+            {searchQuery
+              ? "جرب البحث بكلمات مختلفة"
+              : "ابدأ بإضافة أول مدرب للأكاديمية"}
+          </p>
+          {!searchQuery && (
+            <button
+              onClick={() => {
+                resetForm();
+                setShowModal(true);
+              }}
+              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors inline-flex items-center gap-2 font-medium"
+            >
+              <Plus className="w-5 h-5" />
+              إضافة مدرب
+            </button>
+          )}
+        </div>
+      ) : (
+        /* Coaches Grid */
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredCoaches.map((coach) => (
+            <div
+              key={coach.id}
+              className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow"
+            >
+              {/* Coach Header */}
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex-1">
+                  <h3 className="text-xl font-bold text-gray-900 mb-1">
+                    {coach.fullName}
+                  </h3>
+                  {coach.specialization && (
+                    <p className="text-sm text-blue-600 font-medium">
+                      {coach.specialization}
+                    </p>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleEdit(coach)}
+                    className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                    title="تعديل"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(coach.id, coach.fullName)}
+                    className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    title="حذف"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Coach Info */}
+              <div className="space-y-3 mb-4">
+                {coach.email && (
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <Mail className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                    <span className="truncate">{coach.email}</span>
+                  </div>
+                )}
+                {coach.phone && (
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <Phone className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                    <span dir="ltr">{coach.phone}</span>
+                  </div>
+                )}
+                {coach.experience && (
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <Briefcase className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                    <span>{coach.experience}</span>
+                  </div>
+                )}
+                {coach.certificates && (
+                  <div className="flex items-start gap-2 text-sm text-gray-600">
+                    <Award className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
+                    <span className="line-clamp-2">{coach.certificates}</span>
+                  </div>
+                )}
+                {coach.notes && (
+                  <div className="flex items-start gap-2 text-sm text-gray-600">
+                    <FileText className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
+                    <span className="line-clamp-2">{coach.notes}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="pt-4 border-t border-gray-100 text-xs text-gray-500">
+                {coach.createdAt && (
+                  <p>
+                    أضيف في:{" "}
+                    {new Date(coach.createdAt.seconds * 1000).toLocaleDateString(
+                      "ar-EG"
+                    )}
+                  </p>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {/* Modal */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-in fade-in">
+          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom-4">
+            {/* Modal Header */}
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <Users className="w-5 h-5 text-blue-600" />
+                </div>
+                <h2 className="text-xl font-bold text-gray-900">
+                  {editingCoach ? "تعديل بيانات المدرب" : "إضافة مدرب جديد"}
+                </h2>
+              </div>
+              <button
+                onClick={resetForm}
+                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                disabled={submitting}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <form onSubmit={handleSubmit} className="p-6 space-y-5">
+              {/* Full Name */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  الاسم الكامل <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <Users className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type="text"
+                    value={formData.fullName}
+                    onChange={(e) =>
+                      setFormData({ ...formData, fullName: e.target.value })
+                    }
+                    placeholder="أدخل الاسم الكامل للمدرب"
+                    className="w-full pr-10 pl-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    required
+                    disabled={submitting}
+                  />
+                </div>
+              </div>
+
+              {/* Email & Phone */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    البريد الإلكتروني <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <Mail className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <input
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) =>
+                        setFormData({ ...formData, email: e.target.value })
+                      }
+                      placeholder="example@email.com"
+                      className="w-full pr-10 pl-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      required
+                      disabled={submitting}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    رقم الهاتف
+                  </label>
+                  <div className="relative">
+                    <Phone className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <input
+                      type="tel"
+                      value={formData.phone}
+                      onChange={(e) =>
+                        setFormData({ ...formData, phone: e.target.value })
+                      }
+                      placeholder="+20 123 456 7890"
+                      dir="ltr"
+                      className="w-full pr-10 pl-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-right"
+                      disabled={submitting}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Specialization & Experience */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    التخصص
+                  </label>
+                  <div className="relative">
+                    <Briefcase className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <input
+                      type="text"
+                      value={formData.specialization}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          specialization: e.target.value,
+                        })
+                      }
+                      placeholder="مثال: مدرب حراس، مدرب لياقة..."
+                      className="w-full pr-10 pl-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      disabled={submitting}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    سنوات الخبرة
+                  </label>
+                  <div className="relative">
+                    <Award className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <input
+                      type="text"
+                      value={formData.experience}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          experience: e.target.value,
+                        })
+                      }
+                      placeholder="مثال: 5 سنوات"
+                      className="w-full pr-10 pl-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      disabled={submitting}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Certificates */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  الشهادات والبطاقات
+                </label>
+                <div className="relative">
+                  <Award className="absolute right-3 top-3 w-5 h-5 text-gray-400" />
+                  <textarea
+                    value={formData.certificates}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        certificates: e.target.value,
+                      })
+                    }
+                    placeholder="اذكر الشهادات والبطاقات المهنية..."
+                    rows={3}
+                    className="w-full pr-10 pl-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none"
+                    disabled={submitting}
+                  />
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  ملاحظات إضافية
+                </label>
+                <div className="relative">
+                  <FileText className="absolute right-3 top-3 w-5 h-5 text-gray-400" />
+                  <textarea
+                    value={formData.notes}
+                    onChange={(e) =>
+                      setFormData({ ...formData, notes: e.target.value })
+                    }
+                    placeholder="أي ملاحظات إضافية عن المدرب..."
+                    rows={3}
+                    className="w-full pr-10 pl-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none"
+                    disabled={submitting}
+                  />
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="flex gap-3 pt-4 border-t border-gray-200">
+                <button
+                  type="button"
+                  onClick={resetForm}
+                  disabled={submitting}
+                  className="flex-1 px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="flex-1 px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {submitting ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      جاري الحفظ...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-5 h-5" />
+                      {editingCoach ? "تحديث" : "إضافة"}
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
-};
-
-export default Coaches;
+              }
