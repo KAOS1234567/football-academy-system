@@ -390,3 +390,84 @@ const TeamDetails = ({ team, tabs, activeTab, setActiveTab, onBack }: { team: Te
   );
 }
 */
+// src/components/Teams.tsx - Part 3/4
+
+// ==========================================
+// 6. TAB CONTENT COMPONENT
+// ==========================================
+const TabContent = ({ activeTab, team }: { activeTab: TabType; team: Team }) => {
+  const renderEmptyState = (icon: string, title: string, desc: string) => (
+    <div className="flex flex-col items-center justify-center py-16 text-center">
+      <div className="w-16 h-16 bg-zinc-100 rounded-full flex items-center justify-center text-2xl mb-4">{icon}</div>
+      <h3 className="text-lg font-semibold text-zinc-900 mb-1">{title}</h3>
+      <p className="text-sm text-zinc-500 max-w-sm">{desc}</p>
+      <button className="mt-4 px-4 py-2 bg-zinc-900 text-white text-sm font-medium rounded-lg hover:bg-zinc-800 transition-colors">
+        إضافة عنصر جديد
+      </button>
+    </div>
+  );
+
+  switch (activeTab) {
+    case 'players':
+      return renderEmptyState('👥', 'لا يوجد لاعبون', 'قم بإضافة لاعبين إلى هذا الفريق لبدء إدارة تشكيلتك.');
+    case 'staff':
+      return renderEmptyState('👔', 'لا يوجد جهاز فني', 'أضف مدربين ومساعدين ومحللين إلى الفريق.');
+    case 'training':
+      return renderEmptyState('🏃', 'لا توجد تدريبات', 'قم بجدولة حصص تدريبية للفريق.');
+    case 'attendance':
+      return renderEmptyState('📋', 'لا يوجد سجل حضور', 'تتبع حضور وغياب اللاعبين.');
+    case 'matches':
+      return renderEmptyState('⚽', 'لا توجد مباريات', 'أضف مباريات قادمة أو سجل نتائج المباريات السابقة.');
+    case 'statistics':
+      return (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-zinc-50 p-4 rounded-lg border border-zinc-100">
+            <p className="text-xs text-zinc-500">معدل الفوز</p>
+            <p className="text-2xl font-bold text-zinc-900 mt-1">0%</p>
+          </div>
+          <div className="bg-zinc-50 p-4 rounded-lg border border-zinc-100">
+            <p className="text-xs text-zinc-500">الأهداف المسجلة</p>
+            <p className="text-2xl font-bold text-zinc-900 mt-1">0</p>
+          </div>
+          <div className="bg-zinc-50 p-4 rounded-lg border border-zinc-100">
+            <p className="text-xs text-zinc-500">الأهداف المستقبلة</p>
+            <p className="text-2xl font-bold text-zinc-900 mt-1">0</p>
+          </div>
+        </div>
+      );
+    case 'achievements':
+      return renderEmptyState('🏆', 'لا توجد إنجازات', 'سجل بطولات وجوائز الفريق.');
+    case 'documents':
+      return renderEmptyState('📄', 'لا توجد مستندات', 'ارفع عقود اللاعبين والمستندات الطبية.');
+    case 'videos':
+      return renderEmptyState('🎥', 'لا توجد فيديوهات', 'أضف فيديوهات التحليل وأبرز اللقطات.');
+    case 'timeline':
+      return (
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold text-zinc-900 mb-4">السجل الزمني للفريق</h3>
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="w-16 h-16 bg-zinc-100 rounded-full flex items-center justify-center text-2xl mb-4">🕒</div>
+            <h3 className="text-lg font-semibold text-zinc-900 mb-1">السجل فارغ</h3>
+            <p className="text-sm text-zinc-500 max-w-sm">سيتم تسجيل جميع أحداث الفريق هنا تلقائياً.</p>
+          </div>
+        </div>
+      );
+    default:
+      return null;
+  }
+};
+
+// ==========================================
+// 7. TIMELINE HELPER (AI Ready)
+// ==========================================
+export const generateTimelineEvent = (
+  type: TimelineEvent['type'],
+  description: string,
+  actor: string = 'System'
+): TimelineEvent => ({
+  id: crypto.randomUUID(),
+  type,
+  description,
+  timestamp: new Date(),
+  actor,
+});
