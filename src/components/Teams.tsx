@@ -470,3 +470,170 @@ export const generateTimelineEvent = (
   timestamp: new Date(),
   actor,
 });
+// src/components/Teams.tsx - Part 4/4
+
+// ==========================================
+// 8. FIREBASE INTEGRATION PLACEHOLDER
+// ==========================================
+// TODO: Replace the line below with your ACTUAL Firebase import.
+// Example: import { db } from '../lib/firebase';
+// import { collection, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
+
+// Mock DB to ensure ZERO build errors until you provide the path
+const db = null as any; 
+
+export default function Teams() {
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
+  const [activeTab, setActiveTab] = useState<TabType>('players');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterCategory, setFilterCategory] = useState<AgeCategory | 'all'>('all');
+  const [filterStatus, setFilterStatus] = useState<TeamStatus | 'all'>('all');
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [editingTeam, setEditingTeam] = useState<Team | null>(null);
+
+  const filteredTeams = useMemo(() => {
+    return teams.filter(team => {
+      const matchesSearch = team.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            team.coachName.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesCategory = filterCategory === 'all' || team.ageCategory === filterCategory;
+      const matchesStatus = filterStatus === 'all' || team.status === filterStatus;
+      return matchesSearch && matchesCategory && matchesStatus;
+    });
+  }, [teams, searchQuery, filterCategory, filterStatus]);
+
+  const tabs: { id: TabType; label: string; icon: string }[] = [
+    { id: 'players', label: 'اللاعبون', icon: '👥' },
+    { id: 'staff', label: 'الجهاز الفني', icon: '👔' },
+    { id: 'training', label: 'التدريب', icon: '🏃' },
+    { id: 'attendance', label: 'الحضور', icon: '📋' },
+    { id: 'matches', label: 'المباريات', icon: '⚽' },
+    { id: 'statistics', label: 'الإحصائيات', icon: '📊' },
+    { id: 'achievements', label: 'الإنجازات', icon: '🏆' },
+    { id: 'documents', label: 'المستندات', icon: '📄' },
+    { id: 'videos', label: 'الفيديوهات', icon: '🎥' },
+    { id: 'timeline', label: 'السجل الزمني', icon: '🕒' },
+  ];
+
+  const handleSaveTeam = async (data: TeamFormData) => {
+    try {
+      // TODO: FIREBASE - Uncomment and use your actual db instance
+      // if (data.id) {
+      //   await updateDoc(doc(db, 'teams', data.id), { ...data, updatedAt: new Date() });
+      // } else {
+      //   const newDoc = await addDoc(collection(db, 'teams'), { ...data, createdAt: new Date(), updatedAt: new Date() });
+      //   data.id = newDoc.id;
+      // }
+      
+      // Local state update for immediate UI feedback
+      if (data.id) {
+        setTeams(prev => prev.map(t => t.id === data.id ? { ...t, ...data, updatedAt: new Date() } as Team : t));
+        if (selectedTeam?.id === data.id) setSelectedTeam({ ...selectedTeam, ...data, updatedAt: new Date() } as Team);
+      } else {
+        const newTeam: Team = { ...data, id: crypto.randomUUID(), createdAt: new Date(), updatedAt: new Date() } as Team;
+        setTeams(prev => [...prev, newTeam]);
+      }
+      setIsCreateModalOpen(false);
+      setEditingTeam(null);
+    } catch (error) {
+      console.error('Error saving team:', error);
+    }
+  };
+
+  const handleDeleteTeam = async (teamId: string) => {
+    if (!window.confirm('هل أنت متأكد من حذف هذا الفريق؟ لا يمكن التراجع عن هذا الإجراء.')) return;
+    try {
+      // TODO: FIREBASE - await deleteDoc(doc(db, 'teams', teamId));
+      setTeams(prev => prev.filter(t => t.id !== teamId));
+      if (selectedTeam?.id === teamId) setSelectedTeam(null);
+    } catch (error) {
+      console.error('Error deleting team:', error);
+    }
+  };
+
+  return (
+    <div dir="rtl" className="min-h-screen bg-zinc-50 text-zinc-900 font-sans antialiased">
+      <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-zinc-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-zinc-900">إدارة الفرق</h1>
+            <p className="text-sm text-zinc-500 mt-1">إدارة وتنظيم فرق الأكاديمية</p>
+          </div>
+          <button
+            onClick={() => { setEditingTeam(null); setIsCreateModalOpen(true); }}
+            className="w-full sm:w-auto px-4 py-2 bg-zinc-900 text-white text-sm font-medium rounded-lg hover:bg-zinc-800 transition-colors shadow-sm flex items-center justify-center gap-2"
+          >
+            <span>+</span>
+            <span>فريق جديد</span>
+          </button>
+        </div>
+      </header>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="flex flex-col md:flex-row gap-3">
+          <div className="relative flex-1">
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400">🔍</span>
+            <input
+              type="text"
+              placeholder="بحث بالاسم أو المدرب..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pr-10 pl-4 py-2 bg-white border border-zinc-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-300 transition-all"
+            />
+          </div>
+          <select
+            value={filterCategory}
+            onChange={(e) => setFilterCategory(e.target.value as AgeCategory | 'all')}
+            className="px-4 py-2 bg-white border border-zinc-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
+          >
+            <option value="all">كل الفئات</option>
+            {AGE_CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+          </select>
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value as TeamStatus | 'all')}
+            className="px-4 py-2 bg-white border border-zinc-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
+          >
+            <option value="all">كل الحالات</option>
+            <option value="active">نشط</option>
+            <option value="inactive">غير نشط</option>
+            <option value="archived">مؤرشف</option>
+          </select>
+        </div>
+      </div>
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
+        {selectedTeam ? (
+          <TeamDetails 
+            team={selectedTeam} 
+            tabs={tabs} 
+            activeTab={activeTab} 
+            setActiveTab={setActiveTab} 
+            onBack={() => setSelectedTeam(null)} 
+          />
+        ) : (
+          <>
+            {filteredTeams.length === 0 ? (
+              <div className="text-center py-20 bg-white border border-zinc-200 rounded-xl">
+                <p className="text-zinc-500">لا توجد فرق مطابقة للبحث.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredTeams.map((team) => (
+                  <TeamCard key={team.id} team={team} onClick={() => setSelectedTeam(team)} />
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </main>
+
+      <TeamModal
+        isOpen={isCreateModalOpen || editingTeam !== null}
+        onClose={() => { setIsCreateModalOpen(false); setEditingTeam(null); }}
+        team={editingTeam}
+        onSave={handleSaveTeam}
+      />
+    </div>
+  );
+}
