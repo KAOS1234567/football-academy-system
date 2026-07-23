@@ -348,9 +348,8 @@ const TeamDetails = ({ team, tabs, activeTab, setActiveTab, onBack }: { team: Te
       </div>
 
       <div className="bg-white border border-zinc-200 rounded-xl p-6 min-h-[400px]">
-        {/* Tab Content will be rendered here in Part 3 */}
-        <p className="text-zinc-500 text-center py-20">محتوى تبويب: {tabs.find(t => t.id === activeTab)?.label}</p>
-      </div>
+  <TabContent activeTab={activeTab} team={team} />
+</div>
     </div>
   );
 };
