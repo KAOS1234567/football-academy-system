@@ -1,87 +1,100 @@
-import React, { useState } from 'react';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc, collection } from 'firebase/firestore';
-import { auth, db } from '../firebase';
+import React, { useState } from "react";
+import { createUserWithEmailAndPassword } from "firebase/auth";
+import { doc, setDoc, collection } from "firebase/firestore";
+import { Link } from "react-router-dom";
+import { auth, db } from "../firebase";
 
-interface RegisterProps {
-  onNavigateToLogin: () => void;
-}
-
-export default function Register({ onNavigateToLogin }: RegisterProps) {
-  const [fullName, setFullName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [role, setRole] = useState<'owner' | 'coach'>('owner');
-  const [academyName, setAcademyName] = useState('');
-  const [inviteCode, setInviteCode] = useState('');
-  const [error, setError] = useState('');
+export default function Register() {
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [role, setRole] = useState<"owner" | "coach">("owner");
+  const [academyName, setAcademyName] = useState("");
+  const [inviteCode, setInviteCode] = useState("");
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setLoading(true);
+
+    setError("");
 
     if (!fullName || !email || !password) {
-      setError('الرجاء ملء كافة الحقول الأساسية.');
-      setLoading(false);
+      setError("الرجاء ملء جميع الحقول.");
       return;
     }
 
-    if (role === 'owner' && !academyName) {
-      setError('الرجاء إدخال اسم الأكاديمية الخاصة بك.');
-      setLoading(false);
+    if (role === "owner" && !academyName) {
+      setError("الرجاء إدخال اسم الأكاديمية.");
       return;
     }
 
-    if (role === 'coach' && !inviteCode) {
-      setError('الرجاء إدخال كود الانضمام الممنوح لك من إدارة الأكاديمية.');
-      setLoading(false);
+    if (role === "coach" && !inviteCode) {
+      setError("الرجاء إدخال كود الدعوة.");
       return;
     }
 
     try {
-      // 1. إنشاء الحساب في Authentication
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const uid = userCredential.user.uid;
+      setLoading(true);
 
-      let targetAcademyId = inviteCode.trim();
+      const credential = await createUserWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
 
-      // 2. إذا كان مالك أكاديمية جديدة، نقوم بتوليد الأكاديمية أولاً
-      if (role === 'owner') {
-        const academyRef = doc(collection(db, 'academies'));
-        targetAcademyId = academyRef.id;
+      const uid = credential.user.uid;
 
-        // توليد رمز دعوة عشوائي للأكاديمية ليستعمله المدربون لاحقاً
-        const generatedInviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+      let academyId = inviteCode.trim();
+
+      if (role === "owner") {
+        const academyRef = doc(collection(db, "academies"));
+
+        academyId = academyRef.id;
+
+        const generatedInviteCode = Math.random()
+          .toString(36)
+          .substring(2, 8)
+          .toUpperCase();
 
         await setDoc(academyRef, {
-          id: targetAcademyId,
+          id: academyId,
           name: academyName,
           ownerId: uid,
           inviteCode: generatedInviteCode,
-          createdAt: new Date().toISOString()
+          createdAt: new Date().toISOString(),
         });
       }
 
-      // 3. حفظ بيانات المستخدم في Firestore وعزله بالـ academyId
-      await setDoc(doc(db, 'users', uid), {
+      await setDoc(doc(db, "users", uid), {
         uid,
         fullName,
         email,
         role,
-        academyId: targetAcademyId,
-        createdAt: new Date().toISOString()
+        academyId,
+        createdAt: new Date().toISOString(),
       });
+
+      // App.tsx سيحول المستخدم تلقائياً إلى Dashboard
 
     } catch (err: any) {
       console.error(err);
-      if (err.code === 'auth/email-already-in-use') {
-        setError('البريد الإلكتروني مستخدم بالفعل.');
-      } else if (err.code === 'auth/weak-password') {
-        setError('كلمة المرور ضعيفة جداً، يجب أن لا تقل عن 6 رموز.');
-      } else {
-        setError('حدث خطأ أثناء إنشأ الحساب. حاول مجدداً.');
+
+      switch (err.code) {
+        case "auth/email-already-in-use":
+          setError("البريد الإلكتروني مستخدم بالفعل.");
+          break;
+
+        case "auth/weak-password":
+          setError("كلمة المرور يجب أن تكون 6 أحرف على الأقل.");
+          break;
+
+        case "auth/invalid-email":
+          setError("البريد الإلكتروني غير صالح.");
+          break;
+
+        default:
+          setError("حدث خطأ أثناء إنشاء الحساب.");
       }
     } finally {
       setLoading(false);
@@ -89,125 +102,155 @@ export default function Register({ onNavigateToLogin }: RegisterProps) {
   };
 
   return (
-    <div class="min-h-screen flex items-center justify-center bg-[#f8fafc] px-4 py-8">
-      <div class="max-w-md w-full space-y-6 bg-white p-8 rounded-2xl shadow-sm border border-slate-100">
-        <div class="text-center">
-          <span class="text-4xl">🌱</span>
-          <h2 class="mt-3 text-3xl font-extrabold text-slate-900 tracking-tight">انضم إلى الأكاديمية</h2>
-          <p class="mt-2 text-sm text-slate-500">ابدأ مسيرتك التدريبية والإدارية الاحترافية اليوم</p>
+    <div className="min-h-screen flex items-center justify-center bg-[#f8fafc] px-4 py-8">
+      <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+
+        <div className="text-center">
+          <div className="text-5xl">🌱</div>
+
+          <h1 className="mt-4 text-3xl font-extrabold text-slate-900">
+            إنشاء حساب
+          </h1>
+
+          <p className="mt-2 text-sm text-slate-500">
+            ApexAcademy AI
+          </p>
         </div>
 
-        <form class="space-y-4" onSubmit={handleRegister}>
+        <form onSubmit={handleRegister} className="mt-8 space-y-5">
+
           {error && (
-            <div class="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl text-sm font-medium">
+            <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-600">
               {error}
             </div>
           )}
 
-          <div class="space-y-3">
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-slate-700">
+              الاسم الكامل
+            </label>
+
+            <input
+              type="text"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              className="w-full rounded-xl border border-slate-200 px-4 py-3 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-slate-700">
+              البريد الإلكتروني
+            </label>
+
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full rounded-xl border border-slate-200 px-4 py-3 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+              style={{ direction: "ltr" }}
+              required
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-slate-700">
+              كلمة المرور
+            </label>
+
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full rounded-xl border border-slate-200 px-4 py-3 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+              style={{ direction: "ltr" }}
+              required
+            />
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-semibold text-slate-700">
+              نوع الحساب
+            </label>
+
+            <div className="grid grid-cols-2 gap-3">
+
+              <button
+                type="button"
+                onClick={() => setRole("owner")}
+                className={`rounded-xl border py-3 font-semibold transition ${
+                  role === "owner"
+                    ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+                    : "border-slate-200"
+                }`}
+              >
+                مالك أكاديمية
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setRole("coach")}
+                className={`rounded-xl border py-3 font-semibold transition ${
+                  role === "coach"
+                    ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+                    : "border-slate-200"
+                }`}
+              >
+                مدرب
+              </button>
+
+            </div>
+          </div>
+
+          {role === "owner" ? (
             <div>
-              <label class="block text-sm font-semibold text-slate-700 mb-1">الاسم الكامل</label>
+              <label className="mb-1 block text-sm font-semibold text-slate-700">
+                اسم الأكاديمية
+              </label>
+
               <input
                 type="text"
-                required
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                placeholder="الكابتن..."
-                class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                value={academyName}
+                onChange={(e) => setAcademyName(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 px-4 py-3 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-200"
               />
             </div>
-
+          ) : (
             <div>
-              <label class="block text-sm font-semibold text-slate-700 mb-1">البريد الإلكتروني</label>
+              <label className="mb-1 block text-sm font-semibold text-slate-700">
+                كود الدعوة
+              </label>
+
               <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="coach@example.com"
-                class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-right"
-                style={{ direction: 'ltr' }}
+                type="text"
+                value={inviteCode}
+                onChange={(e) => setInviteCode(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-center uppercase font-mono focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-200"
               />
             </div>
-
-            <div>
-              <label class="block text-sm font-semibold text-slate-700 mb-1">كلمة المرور</label>
-              <input
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-right"
-                style={{ direction: 'ltr' }}
-              />
-            </div>
-
-            <div>
-              <label class="block text-sm font-semibold text-slate-700 mb-2">نوع الحساب البرمجي</label>
-              <div class="grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => setRole('owner')}
-                  class={`py-3 px-4 text-sm font-bold rounded-xl border transition-all ${role === 'owner' ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-200 text-slate-600 bg-white'}`}
-                >
-                  مالك أكاديمية جديدة
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setRole('coach')}
-                  class={`py-3 px-4 text-sm font-bold rounded-xl border transition-all ${role === 'coach' ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-200 text-slate-600 bg-white'}`}
-                >
-                  مدرب منضم حالياً
-                </button>
-              </div>
-            </div>
-
-            {role === 'owner' ? (
-              <div>
-                <label class="block text-sm font-semibold text-slate-700 mb-1">اسم الأكاديمية الرياضية</label>
-                <input
-                  type="text"
-                  required
-                  value={academyName}
-                  onChange={(e) => setAcademyName(e.target.value)}
-                  placeholder="مثال: أكاديمية الديوانية للشباب"
-                  class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                />
-              </div>
-            ) : (
-              <div>
-                <label class="block text-sm font-semibold text-slate-700 mb-1">كود الدعوة / الانضمام</label>
-                <input
-                  type="text"
-                  required
-                  value={inviteCode}
-                  onChange={(e) => setInviteCode(e.target.value)}
-                  placeholder="أدخل الرمز الممنوح لك"
-                  class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-center uppercase font-mono"
-                />
-              </div>
-            )}
-          </div>
+          )}
 
           <button
             type="submit"
             disabled={loading}
-            class="w-full mt-2 py-3 px-4 border border-transparent text-sm font-bold rounded-xl text-white bg-emerald-600 hover:bg-emerald-700 transition-colors disabled:opacity-50"
+            className="w-full rounded-xl bg-emerald-600 py-3 font-bold text-white transition hover:bg-emerald-700 disabled:opacity-50"
           >
-            {loading ? 'جاري بناء الحساب السحابي...' : 'تأكيد التسجيل والانطلاق'}
+            {loading ? "جاري إنشاء الحساب..." : "إنشاء الحساب"}
           </button>
+
         </form>
 
-        <div class="text-center">
-          <button
-            onClick={onNavigateToLogin}
-            class="text-sm font-semibold text-emerald-600 hover:text-emerald-700 transition-colors"
+        <div className="mt-6 text-center">
+          <Link
+            to="/login"
+            className="text-sm font-semibold text-emerald-600 hover:text-emerald-700"
           >
-            لديك حساب بالفعل؟ سجل دخولك هنا
-          </button>
+            لديك حساب بالفعل؟ تسجيل الدخول
+          </Link>
         </div>
+
       </div>
     </div>
   );
-                  }
+}
