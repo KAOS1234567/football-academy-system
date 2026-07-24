@@ -801,3 +801,167 @@ export const ExecutiveSummary: FC = () => {
 };
 
   
+// ============================================================================
+// ApexAcademy AI - Dashboard.tsx | Part 4/7
+// Quick Actions + Recent Activity Widget
+// ============================================================================
+
+// ============================================================================
+// SECTION 11: Quick Actions
+// ============================================================================
+
+export const QuickActions: FC = () => {
+  const navigate = useNavigate();
+
+  const actions = [
+    {
+      key: 'players' as ModuleKey,
+      label: 'Open Players',
+      icon: 'players' as IconName,
+      color: 'from-blue-500 to-blue-600',
+    },
+    {
+      key: 'coaches' as ModuleKey,
+      label: 'Open Coaches',
+      icon: 'coaches' as IconName,
+      color: 'from-emerald-500 to-emerald-600',
+    },
+    {
+      key: 'teams' as ModuleKey,
+      label: 'Open Teams',
+      icon: 'teams' as IconName,
+      color: 'from-violet-500 to-violet-600',
+    },
+  ];
+
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-lg font-bold text-slate-900">Quick Actions</h2>
+        <span className="text-xs text-slate-500">Fast access to modules</span>
+      </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        {actions.map((action) => (
+          <button
+            key={action.key}
+            onClick={() => navigate(MODULES[action.key].path)}
+            className={cx(
+              'group relative overflow-hidden rounded-xl bg-gradient-to-r p-4 text-left text-white shadow-sm transition hover:shadow-md hover:scale-[1.02]',
+              action.color
+            )}
+          >
+            <div className="absolute -right-4 -top-4 h-16 w-16 rounded-full bg-white/10 transition group-hover:scale-150" />
+            <div className="relative flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/20 backdrop-blur-sm">
+                <Icon name={action.icon} size={20} />
+              </div>
+              <div>
+                <p className="text-sm font-semibold">{action.label}</p>
+                <p className="text-xs text-white/80">
+                  {MODULES[action.key].description}
+                </p>
+              </div>
+            </div>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+};
+
+// ============================================================================
+// SECTION 12: Recent Activity Widget
+// ============================================================================
+
+const ActivityItemRow: FC<{ item: ActivityItem }> = ({ item }) => {
+  const iconMap: Record<ActivityItem['type'], IconName> = {
+    players: 'players',
+    coaches: 'coaches',
+    teams: 'teams',
+    system: 'activity',
+  };
+
+  const colorMap: Record<ActivityItem['type'], string> = {
+    players: 'bg-blue-100 text-blue-600',
+    coaches: 'bg-emerald-100 text-emerald-600',
+    teams: 'bg-violet-100 text-violet-600',
+    system: 'bg-slate-100 text-slate-600',
+  };
+
+  return (
+    <div className="flex items-start gap-3 rounded-lg p-3 transition hover:bg-slate-50">
+      <div
+        className={cx(
+          'flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full',
+          colorMap[item.type]
+        )}
+      >
+        <Icon name={iconMap[item.type]} size={18} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-slate-900 truncate">
+          {item.title}
+        </p>
+        {item.description && (
+          <p className="mt-0.5 text-xs text-slate-500 truncate">
+            {item.description}
+          </p>
+        )}
+        <div className="mt-1 flex items-center gap-2 text-xs text-slate-400">
+          {item.actor && <span className="font-medium">{item.actor}</span>}
+          <span>•</span>
+          <span>{formatRelativeTime(item.timestamp)}</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export const RecentActivityWidget: FC = () => {
+  const { activities, activitiesLoading, activitiesError, refreshActivities } =
+    useDashboard();
+
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="mb-4 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Icon name="activity" size={18} className="text-slate-600" />
+          <h2 className="text-lg font-bold text-slate-900">Recent Activity</h2>
+        </div>
+        <button
+          type="button"
+          onClick={refreshActivities}
+          disabled={activitiesLoading}
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
+          aria-label="Refresh activities"
+        >
+          <Icon
+            name="refresh"
+            size={16}
+            className={cx(activitiesLoading && 'animate-spin')}
+          />
+        </button>
+      </div>
+
+      {activitiesLoading ? (
+        <WidgetSkeleton lines={5} />
+      ) : activitiesError ? (
+        <ErrorState message={activitiesError} onRetry={refreshActivities} />
+      ) : activities.length === 0 ? (
+        <EmptyState
+          icon="activity"
+          title="No recent activity"
+          description="Activity will appear here as actions are performed"
+        />
+      ) : (
+        <div className="space-y-1">
+          {activities.map((item) => (
+            <ActivityItemRow key={item.id} item={item} />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+};
+
+  
