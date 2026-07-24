@@ -1163,3 +1163,174 @@ export const TodaysScheduleWidget: FC = () => {
     </section>
   );
 };
+
+  // ============================================================================
+// ApexAcademy AI - Dashboard.tsx | Part 6/7
+// AI Insights Widget + Main Dashboard Component
+// ============================================================================
+
+// ============================================================================
+// SECTION 15: AI Insights Widget
+// ============================================================================
+
+const InsightItemRow: FC<{ item: AIInsight }> = ({ item }) => {
+  const categoryConfig: Record<
+    AIInsight['category'],
+    { icon: IconName; color: string; label: string }
+  > = {
+    performance: {
+      icon: 'activity',
+      color: 'bg-blue-100 text-blue-600 border-blue-200',
+      label: 'Performance',
+    },
+    trend: {
+      icon: 'sparkles',
+      color: 'bg-violet-100 text-violet-600 border-violet-200',
+      label: 'Trend',
+    },
+    alert: {
+      icon: 'alert',
+      color: 'bg-amber-100 text-amber-600 border-amber-200',
+      label: 'Alert',
+    },
+    recommendation: {
+      icon: 'check',
+      color: 'bg-emerald-100 text-emerald-600 border-emerald-200',
+      label: 'Recommendation',
+    },
+  };
+
+  const config = categoryConfig[item.category];
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-4 transition hover:shadow-sm">
+      <div className="flex items-start gap-3">
+        <div
+          className={cx(
+            'flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg border',
+            config.color
+          )}
+        >
+          <Icon name={config.icon} size={18} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <span
+                  className={cx(
+                    'inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-semibold',
+                    config.color
+                  )}
+                >
+                  {config.label}
+                </span>
+                <span className="text-[10px] text-slate-400">
+                  {formatRelativeTime(item.timestamp)}
+                </span>
+              </div>
+              <h4 className="text-sm font-semibold text-slate-900">
+                {item.title}
+              </h4>
+            </div>
+          </div>
+          <p className="mt-1.5 text-xs text-slate-600 line-clamp-2">
+            {item.summary}
+          </p>
+          <div className="mt-2 flex items-center gap-2">
+            <div className="flex-1 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-indigo-500 to-violet-500 transition-all"
+                style={{ width: `${item.confidence}%` }}
+              />
+            </div>
+            <span className="text-[10px] font-semibold text-slate-500">
+              {item.confidence}% confidence
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export const AIInsightsWidget: FC = () => {
+  const { insights, insightsLoading, insightsError, refreshInsights } =
+    useDashboard();
+
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="mb-4 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Icon name="sparkles" size={18} className="text-indigo-600" />
+          <h2 className="text-lg font-bold text-slate-900">AI Insights</h2>
+        </div>
+        <button
+          type="button"
+          onClick={refreshInsights}
+          disabled={insightsLoading}
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
+          aria-label="Refresh insights"
+        >
+          <Icon
+            name="refresh"
+            size={16}
+            className={cx(insightsLoading && 'animate-spin')}
+          />
+        </button>
+      </div>
+
+      {insightsLoading ? (
+        <WidgetSkeleton lines={3} />
+      ) : insightsError ? (
+        <ErrorState message={insightsError} onRetry={refreshInsights} />
+      ) : insights.length === 0 ? (
+        <EmptyState
+          icon="sparkles"
+          title="No insights yet"
+          description="AI insights will appear here as data is analyzed"
+        />
+      ) : (
+        <div className="space-y-3 max-h-[500px] overflow-y-auto">
+          {insights.map((item) => (
+            <InsightItemRow key={item.id} item={item} />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+};
+
+// ============================================================================
+// SECTION 16: Main Dashboard Component
+// ============================================================================
+
+export const DashboardContent: FC = () => {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
+      <Header />
+      
+      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <div className="space-y-6">
+          {/* Executive Summary */}
+          <ExecutiveSummary />
+
+          {/* Quick Actions */}
+          <QuickActions />
+
+          {/* Main Grid - Activity + Notifications */}
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <RecentActivityWidget />
+            <NotificationsWidget />
+          </div>
+
+          {/* Secondary Grid - Schedule + AI Insights */}
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <TodaysScheduleWidget />
+            <AIInsightsWidget />
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+};
