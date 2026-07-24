@@ -635,3 +635,169 @@ export const Button: FC<
     </button>
   );
 };
+
+
+  // ============================================================================
+// ApexAcademy AI - Dashboard.tsx | Part 3/7
+// Header + Executive Summary Cards
+// ============================================================================
+
+// ============================================================================
+// SECTION 9: Header Component
+// ============================================================================
+
+export const Header: FC = () => {
+  const { date, time } = useCurrentTime();
+  const { notifications } = useDashboard();
+  const unreadCount = notifications.filter((n) => !n.read).length;
+  const [search, setSearch] = useState('');
+
+  return (
+    <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/80 backdrop-blur-md">
+      <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-md">
+            <Icon name="sparkles" size={20} />
+          </div>
+          <div>
+            <h1 className="text-lg font-bold tracking-tight text-slate-900">
+              {ACADEMY_NAME}
+            </h1>
+            <p className="text-xs text-slate-500">Executive Dashboard</p>
+          </div>
+        </div>
+
+        <div className="hidden flex-1 max-w-md md:block">
+          <div className="relative">
+            <Icon
+              name="search"
+              size={16}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+            />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search players, coaches, teams..."
+              className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-sm text-slate-700 placeholder-slate-400 transition focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100"
+            />
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 sm:gap-4">
+          <div className="hidden text-right sm:block">
+            <p className="text-xs font-medium text-slate-700">{time}</p>
+            <p className="text-[10px] text-slate-500">{date}</p>
+          </div>
+          
+          <button
+            type="button"
+            className="relative flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+            aria-label="Notifications"
+          >
+            <Icon name="bell" size={18} />
+            {unreadCount > 0 && (
+              <span className="absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            )}
+          </button>
+
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-slate-700 to-slate-900 text-xs font-bold text-white shadow-sm">
+            AD
+          </div>
+        </div>
+      </div>
+    </header>
+  );
+};
+
+// ============================================================================
+// SECTION 10: Executive Summary Cards
+// ============================================================================
+
+interface SummaryCardProps {
+  moduleKey: ModuleKey;
+  count: number;
+  loading: boolean;
+}
+
+const SummaryCard: FC<SummaryCardProps> = ({ moduleKey, count, loading }) => {
+  const config = MODULES[moduleKey];
+  
+  return (
+    <div className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:shadow-md">
+      <div className={cx('absolute -right-6 -top-6 h-24 w-24 rounded-full bg-gradient-to-br opacity-10 transition group-hover:opacity-20', config.gradient)} />
+      
+      <div className="relative flex items-start justify-between">
+        <div className={cx('flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br text-white shadow-sm', config.gradient)}>
+          <Icon name={config.icon} size={22} />
+        </div>
+        {loading ? (
+          <Skeleton className="h-6 w-12 rounded" />
+        ) : (
+          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+            {count}
+          </span>
+        )}
+      </div>
+
+      <div className="relative mt-5">
+        <h3 className="text-sm font-medium text-slate-500">{config.title}</h3>
+        {loading ? (
+          <Skeleton className="mt-2 h-8 w-20 rounded" />
+        ) : (
+          <p className="mt-1 text-3xl font-bold tracking-tight text-slate-900">
+            {count}
+          </p>
+        )}
+        <p className="mt-1 text-xs text-slate-400">{config.description}</p>
+      </div>
+
+      <div className="relative mt-6 flex items-center gap-2">
+        <Link
+          to={config.path}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+        >
+          <Icon name="eye" size={14} />
+          View
+        </Link>
+        <Link
+          to={config.path}
+          className={cx(
+            'inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:opacity-90',
+            config.gradient
+          )}
+        >
+          Open
+          <Icon name="external" size={14} />
+        </Link>
+      </div>
+    </div>
+  );
+};
+
+export const ExecutiveSummary: FC = () => {
+  const { stats, statsLoading } = useDashboard();
+
+  return (
+    <section>
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-lg font-bold text-slate-900">Executive Summary</h2>
+        <span className="text-xs text-slate-500">Overview of academy modules</span>
+      </div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {MODULE_KEYS.map((key) => (
+          <SummaryCard
+            key={key}
+            moduleKey={key}
+            count={stats[key]}
+            loading={statsLoading}
+          />
+        ))}
+      </div>
+    </section>
+  );
+};
+
+  
