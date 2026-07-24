@@ -1,406 +1,268 @@
-import { useState, useEffect } from 'react';
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardHeader, 
-  CardTitle 
-} from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
-import {
-  Users,
-  Calendar,
-  TrendingUp,
-  Bell,
-  Activity,
-  Brain,
-  Plus,
-  UserPlus,
-  ClipboardList,
-  RefreshCw,
-  AlertCircle,
-  Inbox
-} from 'lucide-react';
+// ============================================================================
+// ApexAcademy AI - Dashboard.tsx
+// Enterprise Modular Dashboard | Part 1/7
+// ============================================================================
 
-interface ExecutiveSummaryData {
-  totalPlayers: number;
-  activeCoaches: number;
-  todaySessions: number;
-  revenue: number;
-}
+import React, {
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+  createContext,
+  useContext,
+  type ReactNode,
+  type FC,
+  type SVGProps,
+} from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 
-interface QuickAction {
-  id: string;
-  label: string;
-  icon: React.ElementType;
-  action: () => void;
-}
+// ============================================================================
+// SECTION 1: Types & Interfaces
+// ============================================================================
 
-interface ScheduleItem {
-  id: string;
+export type ModuleKey = 'players' | 'coaches' | 'teams';
+
+export interface ModuleConfig {
+  key: ModuleKey;
   title: string;
-  time: string;
-  location: string;
-  type: 'training' | 'match' | 'meeting';
+  path: string;
+  icon: ModuleKey;
+  color: string;
+  gradient: string;
+  description: string;
 }
 
-interface Notification {
+export interface DashboardStats {
+  players: number;
+  coaches: number;
+  teams: number;
+  lastUpdated: number | null;
+}
+
+export interface ActivityItem {
+  id: string;
+  type: ModuleKey | 'system';
+  title: string;
+  description?: string;
+  timestamp: number;
+  actor?: string;
+}
+
+export interface NotificationItem {
   id: string;
   title: string;
   message: string;
-  timestamp: string;
+  level: 'info' | 'success' | 'warning' | 'error';
+  timestamp: number;
   read: boolean;
 }
 
-interface ActivityItem {
-  id: string;
-  user: string;
-  action: string;
-  timestamp: string;
-}
-
-interface AIInsight {
-  id: string;
-  title: string;
-  description: string;
-  priority: 'low' | 'medium' | 'high';
-  timestamp: string;
-}
-
-interface DashboardState {
-  summary: ExecutiveSummaryData | null;
-  schedule: ScheduleItem[];
-  notifications: Notification[];
-  activities: ActivityItem[];
-  insights: AIInsight[];
-  loading: boolean;
-  error: string | null;
-}
-
-const useDashboardData = () => {
-  const [state, setState] = useState<DashboardState>({
-    summary: null,
-    schedule: [],
-    notifications: [],
-    activities: [],
-    insights: [],
-    loading: true,
-    error: null
-  });
-
-  const loadData = async () => {
-    setState(prev => ({ ...prev, loading: true, error: null }));
-    
-    try {
-      // TODO: Connect to Firebase
-      // For now, initialize with empty data structure
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setState({
-        summary: null,
-        schedule: [],
-        notifications: [],
-        activities: [],
-        insights: [],
-        loading: false,
-        error: null
-      });
-    } catch (error) {
-      setState(prev => ({
-        ...prev,
-        loading: false,
-        error: 'Failed to load dashboard data'
-      }));
-    }
-  };
-
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  return { state, reload: loadData };
-};
-
-const SummarySkeleton = () => (
-  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-    {[...Array(4)].map((_, i) => (
-      <Card key={i}>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <Skeleton className="h-4 w-24" />
-          <Skeleton className="h-8 w-8 rounded" />
-        </CardHeader>
-        <CardContent>
-          <Skeleton className="h-8 w-16 mb-1" />
-          <Skeleton className="h-3 w-32" />
-        </CardContent>
-      </Card>
-    ))}
-  </div>
-);
-
-const SectionSkeleton = () => (
-  <Card>
-    <CardHeader>
-      <Skeleton className="h-6 w-40" />
-      <Skeleton className="h-4 w-60" />
-    </CardHeader>
-    <CardContent>
-      <div className="space-y-3">
-        {[...Array(3)].map((_, i) => (
-          <div key={i} className="flex items-center gap-3">
-            <Skeleton className="h-10 w-10 rounded" />
-            <div className="flex-1">
-              <Skeleton className="h-4 w-full mb-2" />
-              <Skeleton className="h-3 w-3/4" />
-            </div>
-          </div>
-        ))}
-      </div>
-    </CardContent>
-  </Card>
-);
-
-const EmptyState = ({ 
-  icon: Icon, 
-  title, 
-  description 
-}: { 
-  icon: React.ElementType; 
-  title: string; 
-  description: string;
-}) => (
-  <div className="flex flex-col items-center justify-center py-12 text-center">
-    <div className="rounded-full bg-muted p-4 mb-4">
-      <Icon className="h-8 w-8 text-muted-foreground" />
-    </div>
-    <h3 className="text-lg font-semibold mb-2">{title}</h3>
-    <p className="text-sm text-muted-foreground max-w-sm">{description}</p>
-  </div>
-);
-
-const ErrorState = ({ 
-  message, 
-  onRetry 
-}: { 
-  message: string; 
-  onRetry: () => void;
-}) => (
-  <Card>
-    <CardContent className="flex flex-col items-center justify-center py-12">
-      <AlertCircle className="h-12 w-12 text-destructive mb-4" />
-      <h3 className="text-lg font-semibold mb-2">Something went wrong</h3>
-      <p className="text-sm text-muted-foreground mb-4">{message}</p>
-      <Button onClick={onRetry} variant="outline">
-        <RefreshCw className="h-4 w-4 mr-2" />
-        Try Again
-      </Button>
-    </CardContent>
-  </Card>
-);
-
-import { useState, useEffect } from 'react';
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardHeader, 
-  CardTitle 
-} from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
-import {
-  Users,
-  Calendar,
-  TrendingUp,
-  Bell,
-  Activity,
-  Brain,
-  Plus,
-  UserPlus,
-  ClipboardList,
-  RefreshCw,
-  AlertCircle,
-  Inbox
-} from 'lucide-react';
-
-interface ExecutiveSummaryData {
-  totalPlayers: number;
-  activeCoaches: number;
-  todaySessions: number;
-  revenue: number;
-}
-
-interface QuickAction {
-  id: string;
-  label: string;
-  icon: React.ElementType;
-  action: () => void;
-}
-
-interface ScheduleItem {
+export interface ScheduleItem {
   id: string;
   title: string;
   time: string;
-  location: string;
-  type: 'training' | 'match' | 'meeting';
+  type: ModuleKey;
+  location?: string;
 }
 
-interface Notification {
+export interface AIInsight {
   id: string;
+  category: 'performance' | 'trend' | 'alert' | 'recommendation';
   title: string;
-  message: string;
-  timestamp: string;
-  read: boolean;
+  summary: string;
+  confidence: number;
+  timestamp: number;
 }
 
-interface ActivityItem {
-  id: string;
-  user: string;
-  action: string;
-  timestamp: string;
-}
-
-interface AIInsight {
-  id: string;
-  title: string;
-  description: string;
-  priority: 'low' | 'medium' | 'high';
-  timestamp: string;
-}
-
-interface DashboardState {
-  summary: ExecutiveSummaryData | null;
-  schedule: ScheduleItem[];
-  notifications: Notification[];
+export interface DashboardContextValue {
+  stats: DashboardStats;
+  statsLoading: boolean;
+  statsError: string | null;
+  refreshStats: () => void;
   activities: ActivityItem[];
+  activitiesLoading: boolean;
+  activitiesError: string | null;
+  refreshActivities: () => void;
+  notifications: NotificationItem[];
+  notificationsLoading: boolean;
+  notificationsError: string | null;
+  refreshNotifications: () => void;
+  schedule: ScheduleItem[];
+  scheduleLoading: boolean;
+  scheduleError: string | null;
+  refreshSchedule: () => void;
   insights: AIInsight[];
-  loading: boolean;
-  error: string | null;
+  insightsLoading: boolean;
+  insightsError: string | null;
+  refreshInsights: () => void;
 }
 
-const useDashboardData = () => {
-  const [state, setState] = useState<DashboardState>({
-    summary: null,
-    schedule: [],
-    notifications: [],
-    activities: [],
-    insights: [],
-    loading: true,
-    error: null
-  });
+// ============================================================================
+// SECTION 2: Constants & Configuration
+// ============================================================================
 
-  const loadData = async () => {
-    setState(prev => ({ ...prev, loading: true, error: null }));
-    
-    try {
-      setState({
-        summary: null,
-        schedule: [],
-        notifications: [],
-        activities: [],
-        insights: [],
-        loading: false,
-        error: null
-      });
-    } catch (error) {
-      setState(prev => ({
-        ...prev,
-        loading: false,
-        error: 'Failed to load dashboard data'
-      }));
-    }
-  };
-
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  return { state, reload: loadData };
+export const MODULES: Record<ModuleKey, ModuleConfig> = {
+  players: {
+    key: 'players',
+    title: 'Players',
+    path: '/players',
+    icon: 'players',
+    color: 'text-blue-600',
+    gradient: 'from-blue-500 to-blue-600',
+    description: 'Manage academy players roster and profiles',
+  },
+  coaches: {
+    key: 'coaches',
+    title: 'Coaches',
+    path: '/coaches',
+    icon: 'coaches',
+    color: 'text-emerald-600',
+    gradient: 'from-emerald-500 to-emerald-600',
+    description: 'Manage coaching staff and assignments',
+  },
+  teams: {
+    key: 'teams',
+    title: 'Teams',
+    path: '/teams',
+    icon: 'teams',
+    color: 'text-violet-600',
+    gradient: 'from-violet-500 to-violet-600',
+    description: 'Manage teams, squads and formations',
+  },
 };
 
-const SummarySkeleton = () => (
-  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-    {[...Array(4)].map((_, i) => (
-      <Card key={i}>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <Skeleton className="h-4 w-24" />
-          <Skeleton className="h-8 w-8 rounded" />
-        </CardHeader>
-        <CardContent>
-          <Skeleton className="h-8 w-16 mb-1" />
-          <Skeleton className="h-3 w-32" />
-        </CardContent>
-      </Card>
-    ))}
-  </div>
-);
+export const MODULE_KEYS: ModuleKey[] = ['players', 'coaches', 'teams'];
 
-const SectionSkeleton = () => (
-  <Card>
-    <CardHeader>
-      <Skeleton className="h-6 w-40" />
-      <Skeleton className="h-4 w-60" />
-    </CardHeader>
-    <CardContent>
-      <div className="space-y-3">
-        {[...Array(3)].map((_, i) => (
-          <div key={i} className="flex items-center gap-3">
-            <Skeleton className="h-10 w-10 rounded" />
-            <div className="flex-1">
-              <Skeleton className="h-4 w-full mb-2" />
-              <Skeleton className="h-3 w-3/4" />
-            </div>
-          </div>
-        ))}
-      </div>
-    </CardContent>
-  </Card>
-);
+export const ACADEMY_NAME = 'ApexAcademy AI';
 
-const EmptyState = ({ 
-  icon: Icon, 
-  title, 
-  description 
-}: { 
-  icon: React.ElementType; 
-  title: string; 
-  description: string;
-}) => (
-  <div className="flex flex-col items-center justify-center py-12 text-center">
-    <div className="rounded-full bg-muted p-4 mb-4">
-      <Icon className="h-8 w-8 text-muted-foreground" />
-    </div>
-    <h3 className="text-lg font-semibold mb-2">{title}</h3>
-    <p className="text-sm text-muted-foreground max-w-sm">{description}</p>
-  </div>
-);
+// ============================================================================
+// SECTION 3: Utility Functions
+// ============================================================================
 
-const ErrorState = ({ 
-  message, 
-  onRetry 
-}: { 
-  message: string; 
-  onRetry: () => void;
-}) => (
-  <Card>
-    <CardContent className="flex flex-col items-center justify-center py-12">
-      <AlertCircle className="h-12 w-12 text-destructive mb-4" />
-      <h3 className="text-lg font-semibold mb-2">Something went wrong</h3>
-      <p className="text-sm text-muted-foreground mb-4">{message}</p>
-      <Button onClick={onRetry} variant="outline">
-        <RefreshCw className="h-4 w-4 mr-2" />
-        Try Again
-      </Button>
-    </CardContent>
-  </Card>
-);
+export const formatDate = (date: Date = new Date()): string => {
+  return date.toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+};
 
+export const formatTime = (date: Date = new Date()): string => {
+  return date.toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true,
+  });
+};
+
+export const formatRelativeTime = (timestamp: number): string => {
+  const diff = Date.now() - timestamp;
+  const seconds = Math.floor(diff / 1000);
+  if (seconds < 60) return 'Just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return new Date(timestamp).toLocaleDateString();
+};
+
+export const cx = (...classes: (string | false | undefined | null)[]): string =>
+  classes.filter(Boolean).join(' ');
+
+// ============================================================================
+// SECTION 4: Custom Hooks - Time
+// ============================================================================
+
+export const useCurrentTime = (intervalMs: number = 1000) => {
+  const [now, setNow] = useState<Date>(new Date());
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), intervalMs);
+    return () => clearInterval(id);
+  }, [intervalMs]);
+
+  return {
+    date: formatDate(now),
+    time: formatTime(now),
+    raw: now,
+  };
+};
+
+// ============================================================================
+// SECTION 5: Custom Hooks - Data Fetchers (Firebase-ready)
+// ============================================================================
+
+interface FetcherState<T> {
+  data: T;
+  loading: boolean;
+  error: string | null;
+  refresh: () => void;
+}
+
+const useFirebaseReadyFetcher = <T,>(
+  fetcher: () => Promise<T>,
+  emptyValue: T,
+  deps: unknown[] = []
+): FetcherState<T> => {
+  const [data, setData] = useState<T>(emptyValue);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [tick, setTick] = useState(0);
+
+  const refresh = useCallback(() => setTick((t) => t + 1), []);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+
+    fetcher()
+      .then((result) => {
+        if (!cancelled) setData(result);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err?.message || 'Failed to load data');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tick, ...deps]);
+
+  return { data, loading, error, refresh };
+};
+
+// Replace the bodies of these fetchers with Firebase calls when ready.
+const fetchDashboardStats = async (): Promise<DashboardStats> => {
+  // TODO-FIREBASE: subscribe to /stats aggregate
+  return { players: 0, coaches: 0, teams: 0, lastUpdated: null };
+};
+
+const fetchRecentActivity = async (): Promise<ActivityItem[]> => {
+  // TODO-FIREBASE: subscribe to /activity ordered by timestamp desc, limit 10
+  return [];
+};
+
+const fetchNotifications = async (): Promise<NotificationItem[]> => {
+  // TODO-FIREBASE: subscribe to /notifications for current user
+  return [];
+};
+
+const fetchTodaySchedule = async (): Promise<ScheduleItem[]> => {
+  // TODO-FIREBASE: subscribe to /schedule for today
+  return [];
+};
+
+const fetchAIInsights = async (): Promise<AIInsight[]> => {
+  // TODO-FIREBASE: subscribe to /insights generated by AI engine
+  return [];
+};
+  
