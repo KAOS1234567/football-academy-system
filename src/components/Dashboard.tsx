@@ -847,7 +847,7 @@ export const QuickActions: FC = () => {
             onClick={() => {
   console.log("clicked");
   alert("clicked");
-  navigate("/players");
+  window.location.href = "/players";
 }}
             className={cx(
               'group relative overflow-hidden rounded-xl bg-gradient-to-r p-4 text-left text-white shadow-sm transition hover:shadow-md hover:scale-[1.02]',
