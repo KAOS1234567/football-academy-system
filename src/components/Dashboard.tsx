@@ -844,7 +844,11 @@ export const QuickActions: FC = () => {
         {actions.map((action) => (
           <button
             key={action.key}
-            onClick={() => navigate(MODULES[action.key].path)}
+            onClick={() => {
+  console.log("clicked");
+  alert("clicked");
+  navigate("/players");
+}}
             className={cx(
               'group relative overflow-hidden rounded-xl bg-gradient-to-r p-4 text-left text-white shadow-sm transition hover:shadow-md hover:scale-[1.02]',
               action.color
