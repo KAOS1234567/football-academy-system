@@ -965,3 +965,201 @@ export const RecentActivityWidget: FC = () => {
 };
 
   
+// ============================================================================
+// ApexAcademy AI - Dashboard.tsx | Part 5/7
+// Notifications Widget + Today's Schedule Widget
+// ============================================================================
+
+// ============================================================================
+// SECTION 13: Notifications Widget
+// ============================================================================
+
+const NotificationItemRow: FC<{ item: NotificationItem }> = ({ item }) => {
+  const iconMap: Record<NotificationItem['level'], IconName> = {
+    info: 'info',
+    success: 'check',
+    warning: 'warning',
+    error: 'error',
+  };
+
+  const colorMap: Record<NotificationItem['level'], string> = {
+    info: 'bg-blue-100 text-blue-600 border-blue-200',
+    success: 'bg-emerald-100 text-emerald-600 border-emerald-200',
+    warning: 'bg-amber-100 text-amber-600 border-amber-200',
+    error: 'bg-rose-100 text-rose-600 border-rose-200',
+  };
+
+  return (
+    <div
+      className={cx(
+        'flex items-start gap-3 rounded-lg border p-3 transition',
+        item.read ? 'bg-white border-slate-200' : 'bg-slate-50 border-slate-300',
+        colorMap[item.level]
+      )}
+    >
+      <div
+        className={cx(
+          'flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full',
+          colorMap[item.level].split(' ').slice(0, 2).join(' ')
+        )}
+      >
+        <Icon name={iconMap[item.level]} size={16} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-start justify-between gap-2">
+          <p className="text-sm font-semibold text-slate-900 truncate">
+            {item.title}
+          </p>
+          {!item.read && (
+            <span className="flex h-2 w-2 flex-shrink-0 rounded-full bg-blue-500" />
+          )}
+        </div>
+        <p className="mt-0.5 text-xs text-slate-600 line-clamp-2">
+          {item.message}
+        </p>
+        <p className="mt-1 text-[10px] text-slate-400">
+          {formatRelativeTime(item.timestamp)}
+        </p>
+      </div>
+    </div>
+  );
+};
+
+export const NotificationsWidget: FC = () => {
+  const {
+    notifications,
+    notificationsLoading,
+    notificationsError,
+    refreshNotifications,
+  } = useDashboard();
+
+  const unreadCount = notifications.filter((n) => !n.read).length;
+
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="mb-4 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Icon name="bell" size={18} className="text-slate-600" />
+          <h2 className="text-lg font-bold text-slate-900">Notifications</h2>
+          {unreadCount > 0 && (
+            <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-blue-500 px-1.5 text-[10px] font-bold text-white">
+              {unreadCount}
+            </span>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={refreshNotifications}
+          disabled={notificationsLoading}
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
+          aria-label="Refresh notifications"
+        >
+          <Icon
+            name="refresh"
+            size={16}
+            className={cx(notificationsLoading && 'animate-spin')}
+          />
+        </button>
+      </div>
+
+      {notificationsLoading ? (
+        <WidgetSkeleton lines={4} />
+      ) : notificationsError ? (
+        <ErrorState message={notificationsError} onRetry={refreshNotifications} />
+      ) : notifications.length === 0 ? (
+        <EmptyState
+          icon="bell"
+          title="No notifications"
+          description="You're all caught up! New notifications will appear here"
+        />
+      ) : (
+        <div className="space-y-2 max-h-96 overflow-y-auto">
+          {notifications.map((item) => (
+            <NotificationItemRow key={item.id} item={item} />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+};
+
+// ============================================================================
+// SECTION 14: Today's Schedule Widget
+// ============================================================================
+
+const ScheduleItemRow: FC<{ item: ScheduleItem }> = ({ item }) => {
+  const colorMap: Record<ScheduleItem['type'], string> = {
+    players: 'bg-blue-100 text-blue-600',
+    coaches: 'bg-emerald-100 text-emerald-600',
+    teams: 'bg-violet-100 text-violet-600',
+  };
+
+  return (
+    <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-3 transition hover:shadow-sm">
+      <div className="flex flex-col items-center justify-center rounded-lg bg-slate-100 px-3 py-2 min-w-[60px]">
+        <span className="text-xs font-semibold text-slate-700">{item.time}</span>
+      </div>
+      <div
+        className={cx(
+          'flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full',
+          colorMap[item.type]
+        )}
+      >
+        <Icon name={item.type} size={16} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-slate-900 truncate">{item.title}</p>
+        {item.location && (
+          <p className="mt-0.5 text-xs text-slate-500 truncate">{item.location}</p>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export const TodaysScheduleWidget: FC = () => {
+  const { schedule, scheduleLoading, scheduleError, refreshSchedule } =
+    useDashboard();
+
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="mb-4 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Icon name="calendar" size={18} className="text-slate-600" />
+          <h2 className="text-lg font-bold text-slate-900">Today's Schedule</h2>
+        </div>
+        <button
+          type="button"
+          onClick={refreshSchedule}
+          disabled={scheduleLoading}
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
+          aria-label="Refresh schedule"
+        >
+          <Icon
+            name="refresh"
+            size={16}
+            className={cx(scheduleLoading && 'animate-spin')}
+          />
+        </button>
+      </div>
+
+      {scheduleLoading ? (
+        <WidgetSkeleton lines={4} />
+      ) : scheduleError ? (
+        <ErrorState message={scheduleError} onRetry={refreshSchedule} />
+      ) : schedule.length === 0 ? (
+        <EmptyState
+          icon="calendar"
+          title="No events scheduled"
+          description="Your schedule for today will appear here"
+        />
+      ) : (
+        <div className="space-y-2 max-h-96 overflow-y-auto">
+          {schedule.map((item) => (
+            <ScheduleItemRow key={item.id} item={item} />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+};
