@@ -1334,3 +1334,173 @@ export const DashboardContent: FC = () => {
     </div>
   );
 };
+
+
+  // ============================================================================
+// ApexAcademy AI - Dashboard.tsx | Part 7/7 (Final)
+// Main Dashboard Wrapper + Export
+// ============================================================================
+
+// ============================================================================
+// SECTION 17: Main Dashboard Wrapper
+// ============================================================================
+
+const Dashboard: FC = () => {
+  return (
+    <DashboardProvider>
+      <DashboardContent />
+    </DashboardProvider>
+  );
+};
+
+// ============================================================================
+// SECTION 18: Additional Utilities (Optional)
+// ============================================================================
+
+// Helper function to get module color by key
+export const getModuleColor = (key: ModuleKey): string => {
+  return MODULES[key].color;
+};
+
+// Helper function to get module gradient by key
+export const getModuleGradient = (key: ModuleKey): string => {
+  return MODULES[key].gradient;
+};
+
+// Helper function to get module path by key
+export const getModulePath = (key: ModuleKey): string => {
+  return MODULES[key].path;
+};
+
+// ============================================================================
+// SECTION 19: Error Boundary (Optional but Recommended)
+// ============================================================================
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+}
+
+class DashboardErrorBoundary extends React.Component<
+  { children: ReactNode },
+  ErrorBoundaryState
+> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('Dashboard Error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-white to-slate-50">
+          <div className="max-w-md rounded-2xl border border-rose-200 bg-white p-8 shadow-lg text-center">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-rose-100">
+              <Icon name="error" size={32} className="text-rose-600" />
+            </div>
+            <h2 className="mt-4 text-xl font-bold text-slate-900">
+              Something went wrong
+            </h2>
+            <p className="mt-2 text-sm text-slate-600">
+              {this.state.error?.message || 'An unexpected error occurred'}
+            </p>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="mt-6 inline-flex items-center gap-2 rounded-lg bg-rose-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-rose-700 focus:outline-none focus:ring-2 focus:ring-rose-400"
+            >
+              <Icon name="refresh" size={16} />
+              Reload Dashboard
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+// ============================================================================
+// SECTION 20: Enhanced Dashboard with Error Boundary
+// ============================================================================
+
+export const DashboardWithBoundary: FC = () => {
+  return (
+    <DashboardErrorBoundary>
+      <Dashboard />
+    </DashboardErrorBoundary>
+  );
+};
+
+// ============================================================================
+// SECTION 21: Performance Optimizations
+// ============================================================================
+
+// Memoized version for better performance
+export const MemoizedDashboard = React.memo(Dashboard);
+
+// Lazy loading wrapper (if needed)
+export const LazyDashboard = React.lazy(() =>
+  Promise.resolve({ default: Dashboard })
+);
+
+// ============================================================================
+// SECTION 22: Module Documentation
+// ============================================================================
+
+/**
+ * ApexAcademy AI - Enterprise Dashboard
+ * 
+ * @module Dashboard
+ * @description Professional, modular, and scalable dashboard for ApexAcademy AI
+ * 
+ * Features:
+ * - Modular architecture with independent widgets
+ * - Firebase-ready data fetching hooks
+ * - Comprehensive loading, empty, and error states
+ * - Responsive design with Tailwind CSS
+ * - TypeScript for type safety
+ * - Context-based state management
+ * - Error boundary for crash protection
+ * 
+ * Components:
+ * - Header: Academy info, search, notifications, time display
+ * - ExecutiveSummary: Stats cards for Players, Coaches, Teams
+ * - QuickActions: Fast navigation buttons
+ * - RecentActivityWidget: Activity feed with Firebase integration
+ * - NotificationsWidget: Notification center
+ * - TodaysScheduleWidget: Daily schedule display
+ * - AIInsightsWidget: AI-generated insights and recommendations
+ * 
+ * Usage:
+ * ```tsx
+ * import Dashboard from './Dashboard';
+ * 
+ * function App() {
+ *   return <Dashboard />;
+ * }
+ * ```
+ * 
+ * Firebase Integration:
+ * Replace the fetcher functions with actual Firebase calls:
+ * - fetchDashboardStats()
+ * - fetchRecentActivity()
+ * - fetchNotifications()
+ * - fetchTodaySchedule()
+ * - fetchAIInsights()
+ */
+
+// ============================================================================
+// SECTION 23: Final Export
+// ============================================================================
+
+export default Dashboard;
