@@ -20,9 +20,9 @@ export default function App() {
 
   if (loading) {
     return (
-      <div class="min-h-screen flex items-center justify-center bg-[#f8fafc]">
-        <div class="text-center space-y-4">
-          <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto"></div>
+      <div className="min-h-screen flex items-center justify-center bg-[#f8fafc]">
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto"></div>
           <p class="text-slate-500 text-sm font-medium">جاري تأمين الاتصال السحابي...</p>
         </div>
       </div>
